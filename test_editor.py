@@ -651,6 +651,92 @@ class TestFindReplaceDialog:
         
         assert "Hi World" in editor.toPlainText()
 
+    def test_replace_single_with_uppercase_replacement(self, qtbot):
+        """Test single replace using an all-uppercase replacement string."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.setPlainText("hello world hello")
+        
+        dialog = FindReplaceDialog(editor)
+        qtbot.addWidget(dialog)
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("GOODBYE")
+        
+        dialog.find_next()
+        dialog.replace()
+        
+        text = editor.toPlainText()
+        assert text == "GOODBYE world hello"
+        assert text.count("GOODBYE") == 1
+        assert text.count("hello") == 1  # Second "hello" unchanged
+
+    def test_replace_single_with_lowercase_replacement(self, qtbot):
+        """Test single replace using an all-lowercase replacement string."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.setPlainText("HELLO WORLD HELLO")
+        
+        dialog = FindReplaceDialog(editor)
+        qtbot.addWidget(dialog)
+        dialog.find_input.setText("HELLO")
+        dialog.replace_input.setText("goodbye")
+        
+        dialog.find_next()
+        dialog.replace()
+        
+        text = editor.toPlainText()
+        assert text == "goodbye WORLD HELLO"
+        assert text.count("goodbye") == 1
+        assert text.count("HELLO") == 1  # Second "HELLO" unchanged
+
+    def test_replace_single_with_mixed_case_replacement(self, qtbot):
+        """Test single replace using a mixed-case replacement string."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.setPlainText("foo bar foo")
+        
+        dialog = FindReplaceDialog(editor)
+        qtbot.addWidget(dialog)
+        dialog.find_input.setText("foo")
+        dialog.replace_input.setText("BaZ")
+        
+        dialog.find_next()
+        dialog.replace()
+        
+        text = editor.toPlainText()
+        assert text == "BaZ bar foo"
+        assert text.count("BaZ") == 1
+        assert text.count("foo") == 1  # Second "foo" unchanged
+
+    def test_replace_single_finds_different_case(self, qtbot):
+        """Test that single replace can find and replace different case variations."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.setPlainText("Hello HELLO hello")
+        
+        dialog = FindReplaceDialog(editor)
+        qtbot.addWidget(dialog)
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("BYE")
+        
+        # Find and replace first match
+        dialog.find_next()
+        dialog.replace()
+        
+        # Find and replace second match
+        dialog.find_next()
+        dialog.replace()
+        
+        # Find and replace third match
+        dialog.find_next()
+        dialog.replace()
+        
+        text = editor.toPlainText()
+        assert text.count("BYE") == 3
+        assert "Hello" not in text
+        assert "HELLO" not in text
+        assert "hello" not in text
+
     def test_replace_all(self, qtbot):
         editor = CodeEditor()
         qtbot.addWidget(editor)
@@ -744,62 +830,116 @@ class TestFindReplaceDialog:
         # After replacing first "Hello", text should still have other variations
         assert "hello" in text or "HELLO" in text
 
-    def test_replace_all_case_sensitive(self, qtbot):
-        """Test that replace all replaces all case variations (Python str.replace behavior)."""
+    def test_replace_all_should_be_case_insensitive_like_find(self, qtbot):
+        """
+        Replace All should be case-insensitive, matching Find's behavior.
+        
+        When searching for 'what', Replace All should replace ALL case variations:
+        'what', 'What', 'WHAT' should all be replaced.
+        """
         editor = CodeEditor()
         qtbot.addWidget(editor)
-        editor.setPlainText("Hello hello HELLO world")
+        editor.setPlainText("what What WHAT what")
         
         dialog = FindReplaceDialog(editor)
         qtbot.addWidget(dialog)
-        dialog.find_input.setText("Hello")
-        dialog.replace_input.setText("Hi")
+        dialog.find_input.setText("what")
+        dialog.replace_input.setText("what!")
+        
         dialog.replace_all()
         
         text = editor.toPlainText()
-        # Python's str.replace is case-sensitive, so only exact "Hello" is replaced
-        assert text == "Hi hello HELLO world"
-        assert text.count("Hi") == 1
-        assert "hello" in text
-        assert "HELLO" in text
+        # Replace All should replace ALL case variations (case-insensitive)
+        assert text.count("what!") == 4  # All 4 instances should be replaced
+        assert "What" not in text  # Should be replaced
+        assert "WHAT" not in text  # Should be replaced
 
-    def test_replace_all_lowercase_only(self, qtbot):
-        """Test replace all with lowercase search term."""
-        editor = CodeEditor()
-        qtbot.addWidget(editor)
-        editor.setPlainText("hello Hello HELLO hello")
-        
-        dialog = FindReplaceDialog(editor)
-        qtbot.addWidget(dialog)
-        dialog.find_input.setText("hello")
-        dialog.replace_input.setText("hi")
-        dialog.replace_all()
-        
-        text = editor.toPlainText()
-        # Only lowercase "hello" instances should be replaced
-        assert text == "hi Hello HELLO hi"
-        assert text.count("hi") == 2
-        assert "Hello" in text
-        assert "HELLO" in text
-
-    def test_replace_all_uppercase_only(self, qtbot):
-        """Test replace all with uppercase search term."""
+    def test_replace_all_with_uppercase_replacement(self, qtbot):
+        """Test Replace All using an all-uppercase replacement string."""
         editor = CodeEditor()
         qtbot.addWidget(editor)
         editor.setPlainText("hello Hello HELLO world")
         
         dialog = FindReplaceDialog(editor)
         qtbot.addWidget(dialog)
-        dialog.find_input.setText("HELLO")
-        dialog.replace_input.setText("HI")
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("GOODBYE")
         dialog.replace_all()
         
         text = editor.toPlainText()
-        # Only uppercase "HELLO" should be replaced
-        assert text == "hello Hello HI world"
-        assert "HI" in text
-        assert "hello" in text
-        assert "Hello" in text
+        # All case variations of "hello" should be replaced with "GOODBYE"
+        assert text == "GOODBYE GOODBYE GOODBYE world"
+        assert text.count("GOODBYE") == 3
+        assert "hello" not in text.lower() or "goodbye" in text.lower()
+
+    def test_replace_all_with_lowercase_replacement(self, qtbot):
+        """Test Replace All using an all-lowercase replacement string."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.setPlainText("HELLO Hello HeLLo world")
+        
+        dialog = FindReplaceDialog(editor)
+        qtbot.addWidget(dialog)
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("goodbye")
+        dialog.replace_all()
+        
+        text = editor.toPlainText()
+        # All case variations of "hello" should be replaced with "goodbye"
+        assert text == "goodbye goodbye goodbye world"
+        assert text.count("goodbye") == 3
+
+    def test_replace_all_with_mixed_case_replacement(self, qtbot):
+        """Test Replace All using a mixed-case replacement string."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.setPlainText("foo FOO Foo fOO world")
+        
+        dialog = FindReplaceDialog(editor)
+        qtbot.addWidget(dialog)
+        dialog.find_input.setText("foo")
+        dialog.replace_input.setText("BaR")
+        dialog.replace_all()
+        
+        text = editor.toPlainText()
+        # All case variations of "foo" should be replaced with "BaR"
+        assert text == "BaR BaR BaR BaR world"
+        assert text.count("BaR") == 4
+        assert "foo" not in text.lower() or "bar" in text.lower()
+
+    def test_multiple_replace_all_operations(self, qtbot):
+        """Test performing multiple Replace All operations in sequence."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.setPlainText("The quick brown fox jumps over the lazy dog")
+        
+        dialog = FindReplaceDialog(editor)
+        qtbot.addWidget(dialog)
+        
+        # First replace: "the" -> "THE" (case-insensitive)
+        dialog.find_input.setText("the")
+        dialog.replace_input.setText("THE")
+        dialog.replace_all()
+        
+        text = editor.toPlainText()
+        assert text.count("THE") == 2
+        
+        # Second replace: "fox" -> "FOX"
+        dialog.find_input.setText("fox")
+        dialog.replace_input.setText("FOX")
+        dialog.replace_all()
+        
+        text = editor.toPlainText()
+        assert "FOX" in text
+        
+        # Third replace: "dog" -> "Cat"
+        dialog.find_input.setText("dog")
+        dialog.replace_input.setText("Cat")
+        dialog.replace_all()
+        
+        text = editor.toPlainText()
+        assert "Cat" in text
+        assert text == "THE quick brown FOX jumps over THE lazy Cat"
 
 
 class TestKeyboardShortcuts:

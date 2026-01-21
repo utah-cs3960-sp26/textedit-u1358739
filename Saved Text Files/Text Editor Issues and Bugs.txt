@@ -1,0 +1,12 @@
+When I only use find and replace then exit a file, it doesn't warn me about unsaved changes.
+When clicking on edit or view in the menu bar, the shortcut description and the shortcut are sometimes overlapping.
+To zoom in I have to press ctrlShift+ instead of just ctrl+.
+
+When first opening the text editor it goes off the screen a little until it is repositioned.
+When zooming in or out doesn't change the size of the line numbers and they look really bad.
+
+Currently can't change which folder is shown in the side bar.
+If something is added to a file then removed, it still shows that the file needs to be saved.
+When zooming, it is impossible to tell if I am back at the default 100% or not.
+
+Scroll bar doesn't look that great.

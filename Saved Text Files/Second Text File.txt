@@ -53,5 +53,5 @@ I think that is every thing.  I am just going to try zooming out a ton then clos
 Oh ya real quick forgot to mention that when zooming in you literlly have to do ctrl + +.  Meaning ctrl + shift + =.  Because shift is required to type '+'.
 
 Anyways I am going to try that now.
-Ok ya it zooms back to the normal size.
-But you open the text editor it is for some reason off my screen a little bit.  At first I thought it didn't save the last two lines of my file, but I realized that they were just off the screen.
+Ok ya it zooms back to the normal size on reopen.
+But when you open the text editor it is for some reason off my screen a little bit.  At first I thought it didn't save the last two lines of my file, but I realized that they were just off the screen.
