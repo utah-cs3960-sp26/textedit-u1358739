@@ -1123,6 +1123,54 @@ class TestWindowGeometry:
 class TestKeyboardShortcuts:
     """Tests for keyboard shortcuts."""
 
+    def test_zoom_in_shortcut_is_ctrl_equals(self, qtbot):
+        """
+        Test that the Zoom In menu action uses Ctrl+= (without Shift) as shortcut.
+        On most keyboards, + requires Shift, so Ctrl+= is more accessible.
+        """
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Find the Zoom In action in the View menu
+        menubar = window.menuBar()
+        zoom_in_action = None
+        
+        for menu_action in menubar.actions():
+            if "View" in menu_action.text():
+                view_menu = menu_action.menu()
+                for action in view_menu.actions():
+                    if "Zoom" in action.text() and "In" in action.text():
+                        zoom_in_action = action
+                        break
+        
+        assert zoom_in_action is not None, "Zoom In action not found"
+        
+        # Check the shortcut is Ctrl+= (not Ctrl+Shift+=)
+        shortcut = zoom_in_action.shortcut().toString()
+        assert shortcut == "Ctrl+=", \
+            f"Zoom In shortcut should be 'Ctrl+=' but got '{shortcut}'"
+
+    def test_no_alternate_zoom_in_shortcut(self, qtbot):
+        """
+        Test that Ctrl+Shift+= (Ctrl++) does NOT work as a zoom in shortcut.
+        Only Ctrl+= should zoom in.
+        """
+        from PySide6.QtGui import QShortcut
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Check that there are no QShortcut children with Ctrl++ binding
+        shortcuts = window.findChildren(QShortcut)
+        zoom_plus_shortcuts = [s for s in shortcuts if "+" in s.key().toString()]
+        
+        assert len(zoom_plus_shortcuts) == 0, \
+            f"Should not have alternate Ctrl++ shortcut, but found: {[s.key().toString() for s in zoom_plus_shortcuts]}"
+
     def test_ctrl_n_new_file(self, qtbot, monkeypatch):
         window = TextEditor()
         qtbot.addWidget(window)

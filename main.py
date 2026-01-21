@@ -331,12 +331,12 @@ class TextEditor(QMainWindow):
         view_menu.addAction(self.toggle_sidebar_action)
         
         zoom_in_action = QAction("Zoom &In", self)
-        zoom_in_action.setShortcut(QKeySequence.ZoomIn)
+        zoom_in_action.setShortcut("Ctrl+=")
         zoom_in_action.triggered.connect(self.zoom_in)
         view_menu.addAction(zoom_in_action)
         
         zoom_out_action = QAction("Zoom &Out", self)
-        zoom_out_action.setShortcut(QKeySequence.ZoomOut)
+        zoom_out_action.setShortcut("Ctrl+-")
         zoom_out_action.triggered.connect(self.zoom_out)
         view_menu.addAction(zoom_out_action)
         
