@@ -4,7 +4,7 @@
 // Fixed  When I use Replace All it clears the undo history and I can't undo it.
 
 // Fixed  When first opening the text editor it goes off the screen a little until it is repositioned.
-When zooming in or out doesn't change the size of the line numbers and they look really bad.
+// Fixed  When zooming in or out doesn't change the size of the line numbers and they look really bad.
 
 Currently can't change which folder is shown in the side bar.
 If something is added to a file then removed, it still shows that the file needs to be saved.
