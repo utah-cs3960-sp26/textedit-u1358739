@@ -1017,6 +1017,46 @@ class TestFindReplaceDialog:
         # Verify the warning was shown
         assert len(warning_shown) == 1, "Unsaved changes warning should be shown when closing after Replace All"
 
+    def test_undo_after_replace_all(self, qtbot):
+        """
+        Test that undo works correctly after Replace All:
+        1. Make some changes
+        2. Use Replace All
+        3. Undo Replace All
+        4. Undo the previous changes
+        """
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        
+        # Start with initial text
+        editor.setPlainText("hello world")
+        editor.document().setModified(False)
+        
+        # Make a change: add " foo" at the end
+        cursor = editor.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        editor.setTextCursor(cursor)
+        editor.insertPlainText(" foo")
+        
+        assert editor.toPlainText() == "hello world foo"
+        
+        # Use Replace All to replace "hello" with "goodbye"
+        dialog = FindReplaceDialog(editor)
+        qtbot.addWidget(dialog)
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("goodbye")
+        dialog.replace_all()
+        
+        assert editor.toPlainText() == "goodbye world foo"
+        
+        # Undo Replace All - should go back to "hello world foo"
+        editor.undo()
+        assert editor.toPlainText() == "hello world foo", "Undo should revert Replace All"
+        
+        # Undo the " foo" addition - should go back to "hello world"
+        editor.undo()
+        assert editor.toPlainText() == "hello world", "Undo should revert the ' foo' addition"
+
 
 class TestKeyboardShortcuts:
     """Tests for keyboard shortcuts."""

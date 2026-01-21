@@ -1,6 +1,7 @@
-When I only use find and replace then exit a file, it doesn't warn me about unsaved changes.
+// Fixed  When I only use find and replace then exit a file, it doesn't warn me about unsaved changes.
 When clicking on edit or view in the menu bar, the shortcut description and the shortcut are sometimes overlapping.
 To zoom in I have to press ctrlShift+ instead of just ctrl+.
+When I use Replace All it clears the undo history and I can't undo it.
 
 When first opening the text editor it goes off the screen a little until it is repositioned.
 When zooming in or out doesn't change the size of the line numbers and they look really bad.
