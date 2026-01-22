@@ -12,6 +12,6 @@ Can't drag and drop a file or folder into another folder in the side bar.
 
 // Fixed  Currently can't change which folder is shown in the side bar.
 If something is added to a file then removed, it still shows that the file needs to be saved, but that is what vs code does too.
-When zooming, it is impossible to tell if I am back at the default 100% or not.
+// Fixed  When zooming, it is impossible to tell if I am back at the default 100% or not.
 
-Scroll bar doesn't look that great. 
+Scroll bar doesn't look that great.
