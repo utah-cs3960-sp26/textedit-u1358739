@@ -10,7 +10,7 @@ from PySide6.QtGui import (
     QAction, QKeySequence, QFont, QColor, QPainter, QTextFormat,
     QTextCursor, QFontMetrics, QPalette, QShortcut, QTextCharFormat
 )
-from PySide6.QtCore import Qt, QRect, QSize, QDir, Signal
+from PySide6.QtCore import Qt, QRect, QSize, QDir, Signal, QTimer
 
 
 class LineNumberArea(QWidget):
@@ -188,6 +188,11 @@ class TextEditor(QMainWindow):
     def __init__(self):
         super().__init__()
         self.current_file = None
+        self.base_font_size = 11  # Default font size
+        self.zoom_level = 100  # Percentage
+        self.zoom_indicator_timer = QTimer()
+        self.zoom_indicator_timer.setSingleShot(True)
+        self.zoom_indicator_timer.timeout.connect(self.hide_zoom_indicator)
         self.init_ui()
         self.apply_dark_theme()
     
@@ -202,10 +207,28 @@ class TextEditor(QMainWindow):
         y = (screen.height() - height) // 2
         self.setGeometry(x, y, width, height)
         
-        # Central widget
+        # Zoom indicator label (hidden by default) - will be added to toolbar
+        self.zoom_indicator = QLabel()
+        self.zoom_indicator.setStyleSheet("""
+            background-color: transparent;
+            color: #cccccc;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 4px 12px;
+            font-weight: bold;
+        """)
+        self.zoom_indicator.setVisible(False)
+        self.zoom_indicator.setAlignment(Qt.AlignCenter)
+        
+        # Central widget with main vertical layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        main_layout = QHBoxLayout(central_widget)
+        central_layout = QVBoxLayout(central_widget)
+        central_layout.setContentsMargins(0, 0, 0, 0)
+        central_layout.setSpacing(0)
+        
+        # Main horizontal layout for sidebar and editor
+        main_layout = QHBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
@@ -257,8 +280,12 @@ class TextEditor(QMainWindow):
         
         main_layout.addWidget(splitter)
         
+        # Add main layout to central layout
+        central_layout.addLayout(main_layout)
+        
         # Create menus and toolbars
         self.create_menu_bar()
+        self.create_zoom_indicator_toolbar()
         self.create_status_bar()
         
         # Connect cursor position to status bar
@@ -378,6 +405,14 @@ class TextEditor(QMainWindow):
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
     
+    def create_zoom_indicator_toolbar(self):
+        # Create toolbar for zoom indicator
+        toolbar = self.addToolBar("Zoom")
+        toolbar.setObjectName("ZoomToolbar")
+        toolbar.setMovable(False)
+        toolbar.setIconSize(QSize(0, 0))  # No icons
+        toolbar.addWidget(self.zoom_indicator)
+    
     def create_status_bar(self):
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
@@ -403,15 +438,15 @@ class TextEditor(QMainWindow):
                 border-bottom: 1px solid #454545;
             }
             QMenuBar::item:selected {
-                background-color: #505050;
+                background-color: #094771;
             }
             QMenu {
                 background-color: #252526;
                 color: #cccccc;
-                border: 1px solid #454545;
+                border: 1px solid #3e3e42;
             }
             QMenu::item {
-                padding: 5px 30px 5px 20px;
+                padding: 4px 20px;
             }
             QMenu::item:selected {
                 background-color: #094771;
@@ -636,6 +671,8 @@ class TextEditor(QMainWindow):
         font.setPointSize(font.pointSize() + 1)
         self.editor.setFont(font)
         self.editor.line_number_area.setFont(font)
+        self.update_zoom_level()
+        self.show_zoom_indicator()
     
     def zoom_out(self):
         font = self.editor.font()
@@ -643,6 +680,25 @@ class TextEditor(QMainWindow):
             font.setPointSize(font.pointSize() - 1)
             self.editor.setFont(font)
             self.editor.line_number_area.setFont(font)
+            self.update_zoom_level()
+            self.show_zoom_indicator()
+    
+    def update_zoom_level(self):
+        """Calculate zoom level as percentage based on current font size."""
+        current_size = self.editor.font().pointSize()
+        self.zoom_level = round((current_size / self.base_font_size) * 100)
+    
+    def show_zoom_indicator(self):
+        """Display the zoom percentage indicator and schedule it to hide."""
+        self.zoom_indicator.setText(f"{self.zoom_level}%")
+        self.zoom_indicator.setVisible(True)
+        self.zoom_indicator_timer.stop()
+        self.zoom_indicator_timer.start(1500)  # Hide after 1.5 seconds
+    
+    def hide_zoom_indicator(self):
+        """Hide the zoom indicator."""
+        self.zoom_indicator.setVisible(False)
+        self.zoom_indicator.setText("")
     
     def show_about(self):
         QMessageBox.about(
