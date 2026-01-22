@@ -1404,6 +1404,104 @@ class TestEditorIntegration:
         assert window.editor.toPlainText() == "Content"
 
 
+class TestFolderLabelDisplay:
+    """Tests for folder name display in sidebar."""
+
+    def test_folder_label_exists(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        assert hasattr(window, 'folder_label')
+        assert window.folder_label is not None
+
+    def test_folder_label_initially_displays_current_folder(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        folder_text = window.folder_label.text()
+        assert len(folder_text) > 0
+        assert "📁" in folder_text
+
+    def test_update_folder_label_with_simple_path(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        test_path = "/home/user/Documents"
+        window.update_folder_label(test_path)
+        
+        assert "Documents" in window.folder_label.text()
+        assert "📁" in window.folder_label.text()
+
+    def test_update_folder_label_with_nested_path(self, qtbot, tmp_path):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        nested = tmp_path / "level1" / "level2"
+        nested.mkdir(parents=True)
+        
+        window.update_folder_label(str(nested))
+        
+        assert "level2" in window.folder_label.text()
+
+    def test_update_folder_label_with_root_path(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        window.update_folder_label("/")
+        
+        assert window.folder_label.text() == "📁 /"
+
+    def test_folder_label_updates_on_open_folder(self, qtbot, tmp_path, monkeypatch):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create test folder
+        test_folder = tmp_path / "my_project"
+        test_folder.mkdir()
+        
+        # Mock QFileDialog to return our test folder
+        monkeypatch.setattr(
+            "main.QFileDialog.getExistingDirectory",
+            lambda *args, **kwargs: str(test_folder)
+        )
+        
+        window.open_folder()
+        
+        assert "my_project" in window.folder_label.text()
+
+    def test_folder_label_shows_basename_only(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        full_path = "/very/long/path/to/my_folder"
+        window.update_folder_label(full_path)
+        
+        # Should only show the basename, not the full path
+        assert "my_folder" in window.folder_label.text()
+        assert "/very/long" not in window.folder_label.text()
+
+    def test_folder_label_handles_windows_paths(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        win_path = "C:\\Users\\test\\Projects\\MyApp"
+        window.update_folder_label(win_path)
+        
+        assert "MyApp" in window.folder_label.text()
+
+    def test_folder_label_styling(self, qtbot):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        assert window.folder_label.styleSheet() != ""
+        # Check that dark theme colors are applied
+        assert "#2a2d2e" in window.folder_label.styleSheet() or \
+               "#cccccc" in window.folder_label.styleSheet()
+
+
 class TestFolderOperations:
     """Tests for folder operations (open folder, new folder)."""
 

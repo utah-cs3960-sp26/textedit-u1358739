@@ -212,6 +212,23 @@ class TextEditor(QMainWindow):
         # Splitter for sidebar and editor
         splitter = QSplitter(Qt.Horizontal)
         
+        # File explorer sidebar with header
+        sidebar_widget = QWidget()
+        sidebar_layout = QVBoxLayout(sidebar_widget)
+        sidebar_layout.setContentsMargins(0, 0, 0, 0)
+        sidebar_layout.setSpacing(0)
+        
+        # Folder name header
+        self.folder_label = QLabel()
+        self.folder_label.setStyleSheet("""
+            background-color: #2a2d2e;
+            color: #cccccc;
+            padding: 8px;
+            font-weight: bold;
+            border-bottom: 1px solid #3e3e42;
+        """)
+        sidebar_layout.addWidget(self.folder_label)
+        
         # File explorer sidebar
         self.file_model = QFileSystemModel()
         self.file_model.setRootPath(QDir.currentPath())
@@ -226,12 +243,15 @@ class TextEditor(QMainWindow):
         self.file_tree.setMinimumWidth(200)
         self.file_tree.setMaximumWidth(300)
         self.file_tree.doubleClicked.connect(self.open_file_from_tree)
+        sidebar_layout.addWidget(self.file_tree)
+        
+        self.update_folder_label(QDir.currentPath())
         
         # Editor
         self.editor = CodeEditor()
         self.editor.textChanged.connect(self.on_text_changed)
         
-        splitter.addWidget(self.file_tree)
+        splitter.addWidget(sidebar_widget)
         splitter.addWidget(self.editor)
         splitter.setSizes([200, 1000])
         
@@ -516,6 +536,7 @@ class TextEditor(QMainWindow):
         if folder_path:
             self.file_model.setRootPath(folder_path)
             self.file_tree.setRootIndex(self.file_model.index(folder_path))
+            self.update_folder_label(folder_path)
     
     def open_file_from_tree(self, index):
         file_path = self.file_model.filePath(index)
@@ -584,6 +605,10 @@ class TextEditor(QMainWindow):
         line = cursor.blockNumber() + 1
         col = cursor.columnNumber() + 1
         self.cursor_label.setText(f"Ln {line}, Col {col}")
+    
+    def update_folder_label(self, folder_path):
+        folder_name = os.path.basename(folder_path) or folder_path
+        self.folder_label.setText(f"📁 {folder_name}")
     
     def update_file_type(self, file_path):
         ext = file_path.split('.')[-1].lower() if '.' in file_path else ''

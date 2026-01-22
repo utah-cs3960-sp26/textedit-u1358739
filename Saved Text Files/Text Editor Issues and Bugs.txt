@@ -7,7 +7,7 @@
 // Fixed  When zooming in or out doesn't change the size of the line numbers and they look really bad.
 Can't delete files or folders in the side bar.
 Can't drag and drop a file or folder into another folder in the side bar.
-Can't tell which folder I am in, in the side bar.
+// Fixed  Can't tell which folder I am in, in the side bar.
 
 // Fixed  Currently can't change which folder is shown in the side bar.
 If something is added to a file then removed, it still shows that the file needs to be saved, but that is what vs code does too.
