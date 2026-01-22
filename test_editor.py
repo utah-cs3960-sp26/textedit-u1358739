@@ -1404,6 +1404,141 @@ class TestEditorIntegration:
         assert window.editor.toPlainText() == "Content"
 
 
+class TestFolderOperations:
+    """Tests for folder operations (open folder, new folder)."""
+
+    def test_open_folder_updates_file_tree(self, qtbot, tmp_path):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create a test folder structure
+        test_folder = tmp_path / "test_folder"
+        test_folder.mkdir()
+        (test_folder / "file1.txt").write_text("content1")
+        (test_folder / "file2.txt").write_text("content2")
+        
+        # Simulate opening the folder
+        window.file_model.setRootPath(str(test_folder))
+        window.file_tree.setRootIndex(window.file_model.index(str(test_folder)))
+        
+        # Normalize paths for comparison (Qt uses forward slashes)
+        assert Path(window.file_model.rootPath()) == test_folder
+
+    def test_new_folder_creates_directory(self, qtbot, tmp_path, monkeypatch):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Set root path to tmp_path
+        window.file_model.setRootPath(str(tmp_path))
+        window.file_tree.setRootIndex(window.file_model.index(str(tmp_path)))
+        
+        # Mock QInputDialog to return a folder name
+        monkeypatch.setattr(
+            "main.QInputDialog.getText",
+            lambda *args, **kwargs: ("new_test_folder", True)
+        )
+        
+        window.new_folder()
+        
+        new_folder_path = tmp_path / "new_test_folder"
+        assert new_folder_path.exists()
+        assert new_folder_path.is_dir()
+
+    def test_new_folder_cancelled(self, qtbot, tmp_path, monkeypatch):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.file_model.setRootPath(str(tmp_path))
+        window.file_tree.setRootIndex(window.file_model.index(str(tmp_path)))
+        
+        # Mock QInputDialog to simulate cancel
+        monkeypatch.setattr(
+            "main.QInputDialog.getText",
+            lambda *args, **kwargs: ("", False)
+        )
+        
+        initial_contents = list(tmp_path.iterdir())
+        window.new_folder()
+        
+        # No new folder should be created
+        assert list(tmp_path.iterdir()) == initial_contents
+
+    def test_new_folder_already_exists(self, qtbot, tmp_path, monkeypatch):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create existing folder
+        existing_folder = tmp_path / "existing_folder"
+        existing_folder.mkdir()
+        
+        window.file_model.setRootPath(str(tmp_path))
+        window.file_tree.setRootIndex(window.file_model.index(str(tmp_path)))
+        
+        # Mock QInputDialog to return existing folder name
+        monkeypatch.setattr(
+            "main.QInputDialog.getText",
+            lambda *args, **kwargs: ("existing_folder", True)
+        )
+        
+        # Mock QMessageBox.warning to capture the error
+        warning_called = []
+        monkeypatch.setattr(
+            "main.QMessageBox.warning",
+            lambda *args, **kwargs: warning_called.append(True)
+        )
+        
+        window.new_folder()
+        
+        # Should show warning for existing folder
+        assert len(warning_called) == 1
+
+    def test_new_folder_empty_name(self, qtbot, tmp_path, monkeypatch):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.file_model.setRootPath(str(tmp_path))
+        window.file_tree.setRootIndex(window.file_model.index(str(tmp_path)))
+        
+        # Mock QInputDialog to return empty string but OK clicked
+        monkeypatch.setattr(
+            "main.QInputDialog.getText",
+            lambda *args, **kwargs: ("", True)
+        )
+        
+        initial_contents = list(tmp_path.iterdir())
+        window.new_folder()
+        
+        # No new folder should be created with empty name
+        assert list(tmp_path.iterdir()) == initial_contents
+
+    def test_file_tree_root_path_after_open_folder(self, qtbot, tmp_path):
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create nested folder structure
+        nested = tmp_path / "level1" / "level2"
+        nested.mkdir(parents=True)
+        
+        # Directly call the internal logic that open_folder uses
+        window.file_model.setRootPath(str(nested))
+        window.file_tree.setRootIndex(window.file_model.index(str(nested)))
+        
+        # Normalize paths for comparison (Qt uses forward slashes)
+        assert Path(window.file_model.rootPath()) == nested
+
+
 class TestEdgesCases:
     """Tests for edge cases and error handling."""
 

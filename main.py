@@ -1,9 +1,10 @@
 import sys
+import os
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QPlainTextEdit, QWidget, QVBoxLayout,
     QHBoxLayout, QFileDialog, QMessageBox, QStatusBar, QMenuBar,
     QToolBar, QLabel, QLineEdit, QDialog, QPushButton, QSplitter,
-    QTreeView, QFileSystemModel, QFrame, QTextEdit
+    QTreeView, QFileSystemModel, QFrame, QTextEdit, QInputDialog
 )
 from PySide6.QtGui import (
     QAction, QKeySequence, QFont, QColor, QPainter, QTextFormat,
@@ -254,10 +255,20 @@ class TextEditor(QMainWindow):
         new_action.triggered.connect(self.new_file)
         file_menu.addAction(new_action)
         
+        new_folder_action = QAction("New &Folder...", self)
+        new_folder_action.triggered.connect(self.new_folder)
+        file_menu.addAction(new_folder_action)
+        
+        file_menu.addSeparator()
+        
         open_action = QAction("&Open...", self)
         open_action.setShortcut(QKeySequence.Open)
         open_action.triggered.connect(self.open_file)
         file_menu.addAction(open_action)
+        
+        open_folder_action = QAction("Open Fol&der...", self)
+        open_folder_action.triggered.connect(self.open_folder)
+        file_menu.addAction(open_folder_action)
         
         file_menu.addSeparator()
         
@@ -475,6 +486,20 @@ class TextEditor(QMainWindow):
             self.current_file = None
             self.setWindowTitle("TextEdit - Untitled")
     
+    def new_folder(self):
+        folder_name, ok = QInputDialog.getText(
+            self, "New Folder", "Folder name:"
+        )
+        if ok and folder_name:
+            current_path = self.file_model.rootPath()
+            new_folder_path = os.path.join(current_path, folder_name)
+            try:
+                os.makedirs(new_folder_path, exist_ok=False)
+            except FileExistsError:
+                QMessageBox.warning(self, "Error", f"Folder '{folder_name}' already exists.")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Could not create folder:\n{e}")
+    
     def open_file(self):
         if self.maybe_save():
             file_path, _ = QFileDialog.getOpenFileName(
@@ -483,6 +508,14 @@ class TextEditor(QMainWindow):
             )
             if file_path:
                 self.load_file(file_path)
+    
+    def open_folder(self):
+        folder_path = QFileDialog.getExistingDirectory(
+            self, "Open Folder", self.file_model.rootPath()
+        )
+        if folder_path:
+            self.file_model.setRootPath(folder_path)
+            self.file_tree.setRootIndex(self.file_model.index(folder_path))
     
     def open_file_from_tree(self, index):
         file_path = self.file_model.filePath(index)

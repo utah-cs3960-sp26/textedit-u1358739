@@ -43,6 +43,7 @@ Doesn't look that great tho, but still impressive.
 
 
 
+
 Ya it works pretty good.
 Ok now I need to test zooming in and out.
 Ok when I zoom out to much then the line numbers get cut off.
