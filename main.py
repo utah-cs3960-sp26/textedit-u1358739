@@ -670,7 +670,7 @@ class TextEditor(QMainWindow):
         
         # Position the indicator at top right, aligned with menu bar
         menubar = self.menuBar()
-        x = self.width() - self.zoom_indicator.width() - 10
+        x = self.width() - self.zoom_indicator.width() - 10 - int(self.width() * 0.05)
         y = menubar.height() + 5
         self.zoom_indicator.move(x, y)
         
