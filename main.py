@@ -617,6 +617,10 @@ class TextEditor(QMainWindow):
                     self.editor.clear()
                     self.current_file = None
                     self.setWindowTitle("TextEdit - Untitled")
+                
+                # Refresh file model to stop watching the deleted path
+                root_path = self.file_model.rootPath()
+                self.file_model.setRootPath(root_path)
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Could not delete:\n{e}")
     
