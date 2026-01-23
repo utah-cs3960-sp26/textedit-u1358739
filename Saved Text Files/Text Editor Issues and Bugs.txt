@@ -22,3 +22,6 @@ Scroll bar doesn't look that great.
 // Fixed  When I make changes to a file and it is the only file opened, then when I try to exit then choose save it tries to save it as a new file and asks me for a new filepath and name.
 // Fixed  When I make changes to the untitled file that is up at first, then it doesn't save them.
 // Made so the cursor is focused on opening a file so the user can immediately start typing.
+
+Implement split view.
+Implement multifile find and replace.
