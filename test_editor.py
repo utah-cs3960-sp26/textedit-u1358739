@@ -2,9 +2,10 @@ import pytest
 import os
 import tempfile
 from pathlib import Path
-from PySide6.QtCore import Qt, QPoint, QTimer
+from PySide6.QtCore import Qt, QPoint, QTimer, QDir
 from PySide6.QtGui import QTextCursor, QFont
 from PySide6.QtWidgets import QApplication, QMessageBox, QFileDialog
+from unittest.mock import patch
 
 from main import TextEditor, CodeEditor, FindReplaceDialog, LineNumberArea, CustomTabWidget, CustomTabBar
 
@@ -3112,3 +3113,57 @@ class TestSplitView:
         assert editor.toPlainText() == "hello"
         # Modified flag should be False since content matches saved state
         assert not editor.document().isModified(), "Modified flag should clear when content matches saved state"
+
+
+class TestMultiFileSearchBugFix:
+    """Test for multifile search bug fix: should allow searching with default folder on startup."""
+
+    def test_multifile_search_folder_validation_on_startup(self, qtbot, tmp_path, monkeypatch):
+        """Test that default folder on startup does not trigger validation warning.
+        
+        Bug: When app starts, it loads QDir.currentPath() in the sidebar.
+        But show_multifile_find_dialog() rejects it with:
+            if not folder_path or folder_path == QDir.currentPath():
+        
+        Fix: Remove the folder_path == QDir.currentPath() check.
+        """
+        # Create test file in temp directory
+        file1 = tmp_path / "test_file.txt"
+        file1.write_text("content\n")
+        
+        # Change to temp directory  
+        monkeypatch.chdir(tmp_path)
+        
+        # Create window (loads current directory in file tree on startup)
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        try:
+            # Verify default folder is loaded
+            folder_path = window.file_model.rootPath()
+            assert folder_path == QDir.currentPath(), "Should load current directory"
+            
+            # Mock to capture if warning() is called
+            warning_called = []
+            original_warning = QMessageBox.warning
+            
+            def mock_warning(*args, **kwargs):
+                warning_called.append(True)
+                return None
+            
+            QMessageBox.warning = mock_warning
+            
+            # Mock MultiFileSearchDialog to prevent it from actually showing
+            with patch('main.MultiFileSearchDialog') as MockDialog:
+                try:
+                    window.show_multifile_find_dialog()
+                finally:
+                    QMessageBox.warning = original_warning
+            
+            # With fix: warning should NOT be called
+            # With bug: warning WILL be called because folder_path == QDir.currentPath()
+            assert len(warning_called) == 0, "Should NOT show warning for default folder on startup (indicates bug not fixed)"
+        finally:
+            window.close()

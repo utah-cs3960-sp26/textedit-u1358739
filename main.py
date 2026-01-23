@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QFileDialog, QMessageBox, QStatusBar, QMenuBar,
     QToolBar, QLabel, QLineEdit, QDialog, QPushButton, QSplitter,
     QTreeView, QFileSystemModel, QFrame, QTextEdit, QInputDialog, QMenu,
-    QTabWidget, QTabBar, QStyle
+    QTabWidget, QTabBar, QStyle, QScrollArea
 )
 from PySide6.QtGui import (
     QAction, QKeySequence, QFont, QColor, QPainter, QTextFormat,
@@ -403,6 +403,285 @@ class FindReplaceDialog(QDialog):
                 cursor.endEditBlock()
 
 
+class SearchResultButton(QWidget):
+    """Button-like widget for each search result that opens the file on click."""
+    
+    def __init__(self, file_path, line_num, line_text, match_start, match_text, text_editor, parent=None):
+        super().__init__(parent)
+        self.file_path = file_path
+        self.line_num = line_num
+        self.text_editor = text_editor
+        self.match_text = match_text
+        self.match_start = match_start
+        self.setCursor(Qt.PointingHandCursor)
+        
+        # Create the button content with highlighting
+        file_name = os.path.basename(file_path)
+        
+        # Create full line with highlighted match
+        before = line_text[:match_start]
+        match = line_text[match_start:match_start + len(match_text)]
+        after = line_text[match_start + len(match_text):]
+        
+        # Create HTML text with file info and highlighted line
+        html_text = f"<b>{file_name}:{line_num}</b><br>"
+        html_text += f"<font color='#888888'>{before}</font>"
+        html_text += f"<font style='background-color: #ffff00; color: #000000;'><b>{match}</b></font>"
+        html_text += f"<font color='#888888'>{after}</font>"
+        
+        # Use a QLabel to display HTML
+        self.label = QLabel(html_text)
+        self.label.setWordWrap(True)
+        self.label.setCursor(Qt.PointingHandCursor)
+        
+        # Style the label like a button
+        self.label.setStyleSheet("""
+            QLabel {
+                background-color: #2d2d30;
+                color: #d4d4d4;
+                border: 1px solid #3e3e42;
+                padding: 8px;
+                margin: 2px;
+                font-family: Consolas;
+                font-size: 9pt;
+            }
+        """)
+        
+        # Layout
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.label)
+        
+        # Track hover state for button-like appearance
+        self.is_hovered = False
+    
+    def mousePressEvent(self, event):
+        """Open file when clicked."""
+        self.open_file()
+    
+    def enterEvent(self, event):
+        """Change appearance on hover."""
+        self.label.setStyleSheet("""
+            QLabel {
+                background-color: #3e3e42;
+                color: #d4d4d4;
+                border: 1px solid #007acc;
+                padding: 8px;
+                margin: 2px;
+                font-family: Consolas;
+                font-size: 9pt;
+            }
+        """)
+        super().enterEvent(event)
+    
+    def leaveEvent(self, event):
+        """Restore appearance when mouse leaves."""
+        self.label.setStyleSheet("""
+            QLabel {
+                background-color: #2d2d30;
+                color: #d4d4d4;
+                border: 1px solid #3e3e42;
+                padding: 8px;
+                margin: 2px;
+                font-family: Consolas;
+                font-size: 9pt;
+            }
+        """)
+        super().leaveEvent(event)
+    
+    def open_file(self):
+        """Open the file in the text editor."""
+        self.text_editor.open_file_with_line(self.file_path, self.line_num, self.match_text, self.match_start)
+
+
+class MultiFileSearchResultsDialog(QDialog):
+    """Results window for multifile search."""
+    
+    def __init__(self, results, text_editor, parent=None):
+        super().__init__(parent)
+        self.results = results  # List of (file_path, line_num, line_text, match_pos, match_text)
+        self.text_editor = text_editor
+        self.setWindowTitle(f"Search Results - {len(results)} matches")
+        self.setGeometry(100, 100, 800, 600)
+        self.setup_ui()
+    
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        
+        # Scrollable area for results
+        scroll_area = QWidget()
+        scroll_layout = QVBoxLayout(scroll_area)
+        scroll_layout.setContentsMargins(5, 5, 5, 5)
+        scroll_layout.setSpacing(2)
+        
+        # Create a button for each result with highlighting
+        for file_path, line_num, line_text, match_pos, match_text in self.results:
+            # File info button with full line and highlighting inside
+            btn = SearchResultButton(file_path, line_num, line_text, match_pos, match_text, self.text_editor)
+            scroll_layout.addWidget(btn)
+        
+        scroll_layout.addStretch()
+        
+        # Scroll area
+        scroll_widget = QScrollArea()
+        scroll_widget.setWidget(scroll_area)
+        scroll_widget.setWidgetResizable(True)
+        scroll_widget.setStyleSheet("""
+            QScrollArea {
+                background-color: #1e1e1e;
+                border: none;
+            }
+        """)
+        layout.addWidget(scroll_widget)
+        
+        # Close button
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.close)
+        close_btn.setMaximumWidth(100)
+        layout.addWidget(close_btn)
+
+
+class MultiFileSearchDialog(QDialog):
+    """Multi-file find and replace dialog."""
+    
+    def __init__(self, folder_path, text_editor_instance, parent=None):
+        super().__init__(parent)
+        self.folder_path = folder_path
+        self.text_editor = text_editor_instance
+        self.setWindowTitle("Multi-File Find and Replace")
+        self.setGeometry(100, 100, 500, 250)
+        self.setup_ui()
+    
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        
+        # Find row
+        find_layout = QHBoxLayout()
+        find_layout.addWidget(QLabel("Find:"))
+        self.find_input = QLineEdit()
+        find_layout.addWidget(self.find_input)
+        layout.addLayout(find_layout)
+        
+        # Replace row
+        replace_layout = QHBoxLayout()
+        replace_layout.addWidget(QLabel("Replace:"))
+        self.replace_input = QLineEdit()
+        replace_layout.addWidget(self.replace_input)
+        layout.addLayout(replace_layout)
+        
+        # Folder info
+        folder_layout = QHBoxLayout()
+        folder_layout.addWidget(QLabel("Searching in:"))
+        self.folder_label = QLabel(self.folder_path)
+        self.folder_label.setWordWrap(True)
+        folder_layout.addWidget(self.folder_label)
+        layout.addLayout(folder_layout)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        
+        find_all_btn = QPushButton("Find All")
+        find_all_btn.clicked.connect(self.find_all)
+        button_layout.addWidget(find_all_btn)
+        
+        replace_all_btn = QPushButton("Replace All")
+        replace_all_btn.clicked.connect(self.replace_all_files)
+        button_layout.addWidget(replace_all_btn)
+        
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.close)
+        button_layout.addWidget(close_btn)
+        
+        layout.addLayout(button_layout)
+    
+    def find_all_files(self):
+        """Search for text in all files in the folder."""
+        find_text = self.find_input.text()
+        if not find_text:
+            QMessageBox.warning(self, "Input Error", "Please enter text to find.")
+            return []
+        
+        results = []
+        import re
+        
+        for root, dirs, files in os.walk(self.folder_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                try:
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        for line_num, line in enumerate(f, 1):
+                            if find_text.lower() in line.lower():
+                                # Find all match positions
+                                matches = list(re.finditer(re.escape(find_text), line, re.IGNORECASE))
+                                for match in matches:
+                                    results.append((file_path, line_num, line, match.start(), match.group()))
+                except Exception:
+                    pass
+        
+        return results
+    
+    def find_all(self):
+        """Show all search results."""
+        results = self.find_all_files()
+        if results:
+            dialog = MultiFileSearchResultsDialog(results, self.text_editor, self)
+            dialog.exec()
+        else:
+            QMessageBox.information(self, "No Results", "No matches found.")
+    
+    def replace_all_files(self):
+        """Replace all occurrences in all files."""
+        find_text = self.find_input.text()
+        replace_text = self.replace_input.text()
+        
+        if not find_text:
+            QMessageBox.warning(self, "Input Error", "Please enter text to find.")
+            return
+        
+        results = self.find_all_files()
+        if not results:
+            QMessageBox.information(self, "No Results", "No matches found.")
+            return
+        
+        # Group results by file
+        files_to_replace = {}
+        for file_path, line_num, line, match_pos, match_text in results:
+            if file_path not in files_to_replace:
+                files_to_replace[file_path] = []
+            files_to_replace[file_path].append((line_num, find_text, replace_text))
+        
+        # Replace in each file
+        replaced_count = 0
+        for file_path in files_to_replace:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # Replace all occurrences
+                import re
+                new_content = re.sub(re.escape(find_text), replace_text, content, flags=re.IGNORECASE)
+                
+                if new_content != content:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(new_content)
+                    
+                    # Update any open tabs with this file
+                    if file_path in self.text_editor.open_files:
+                        pane, tab_index = self.text_editor.open_files[file_path]
+                        editor = pane.tab_widget.widget(tab_index)
+                        if editor:
+                            editor.setPlainText(new_content)
+                            editor.document().setModified(True)
+                    
+                    # Count replacements
+                    original_count = len(re.findall(re.escape(find_text), content, re.IGNORECASE))
+                    replaced_count += original_count
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Could not process {file_path}: {e}")
+        
+        QMessageBox.information(self, "Replace Complete", f"Replaced {replaced_count} occurrences in {len(files_to_replace)} files.")
+
+
 class TextEditor(QMainWindow):
     """Main text editor window."""
     
@@ -603,6 +882,11 @@ class TextEditor(QMainWindow):
         find_action.setShortcut(QKeySequence.Find)
         find_action.triggered.connect(self.show_find_dialog)
         edit_menu.addAction(find_action)
+        
+        multifile_find_action = QAction("Multi-File Find and Replace...", self)
+        multifile_find_action.setShortcut("Ctrl+Shift+F")
+        multifile_find_action.triggered.connect(self.show_multifile_find_dialog)
+        edit_menu.addAction(multifile_find_action)
         
         # View menu
         view_menu = menubar.addMenu("&View")
@@ -1442,6 +1726,48 @@ class TextEditor(QMainWindow):
     def show_find_dialog(self):
         dialog = FindReplaceDialog(self.editor, self)
         dialog.exec()
+    
+    def show_multifile_find_dialog(self):
+        """Show multi-file find and replace dialog using the currently displayed folder."""
+        # Get the root path of the file tree
+        folder_path = self.file_model.rootPath()
+        if not folder_path:
+            QMessageBox.warning(self, "No Folder Open", "Please open a folder first using 'Open Folder'.")
+            return
+        
+        dialog = MultiFileSearchDialog(folder_path, self, self)
+        dialog.exec()
+    
+    def open_file_with_line(self, file_path, line_num, match_text, match_start):
+        """Open a file at a specific line with the match highlighted."""
+        self.load_file(file_path)
+        
+        # Wait briefly for file to load
+        QApplication.processEvents()
+        
+        # Scroll to the line and highlight the match
+        if self.editor:
+            doc = self.editor.document()
+            block = doc.findBlockByNumber(line_num - 1)
+            
+            if block.isValid():
+                cursor = QTextCursor(block)
+                # Move to the match position within the line
+                cursor.movePosition(QTextCursor.StartOfBlock)
+                cursor.movePosition(QTextCursor.Right, QTextCursor.MoveAnchor, match_start)
+                cursor.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor, len(match_text))
+                
+                self.editor.setTextCursor(cursor)
+                self.editor.ensureCursorVisible()
+                
+                # Highlight the match
+                extra_selections = []
+                selection = QTextEdit.ExtraSelection()
+                selection.format.setBackground(QColor("#ffff00"))
+                selection.format.setForeground(QColor("#000000"))
+                selection.cursor = cursor
+                extra_selections.append(selection)
+                self.editor.setExtraSelections(extra_selections)
     
     def toggle_sidebar(self):
         self.file_tree.setVisible(not self.file_tree.isVisible())
