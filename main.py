@@ -1053,15 +1053,19 @@ class TextEditor(QMainWindow):
         # Remove the tab (this triggers on_tab_changed)
         self.tab_widget.removeTab(index)
         
-        # If no tabs left, show welcome screen
+        # If no tabs left
         if self.tab_widget.count() == 0:
-            self.tab_widget.hide()
-            self.welcome_screen.show()
-            self.current_file = None
-            self.setWindowTitle("TextEdit")
-            # Update pane header
-            if self.active_pane:
-                self.active_pane.update_file_label("No file")
+            # If there's more than one pane, close this pane instead of showing welcome
+            if len(self.split_panes) > 1:
+                self.close_split_pane(self.active_pane)
+            else:
+                # Only one pane, show welcome screen
+                self.tab_widget.hide()
+                self.welcome_screen.show()
+                self.current_file = None
+                self.setWindowTitle("TextEdit")
+                if self.active_pane:
+                    self.active_pane.update_file_label("No file")
     
     def save_current_file(self):
         """Save the current file."""

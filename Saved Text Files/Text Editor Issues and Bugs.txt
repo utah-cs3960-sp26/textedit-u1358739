@@ -25,3 +25,4 @@ Scroll bar doesn't look that great.
 
 // Implemented  Split view with up to 3 panes, close buttons for each pane, and split button in tab bar.
 Implement multifile find and replace.
+The home screen randomly says no file at the top left.

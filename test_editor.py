@@ -2636,3 +2636,344 @@ class TestMultiTabFunctionality:
         # The file should have been saved
         assert (tmp_path / "saved_untitled.txt").exists(), "File was not saved"
         assert (tmp_path / "saved_untitled.txt").read_text() == "unsaved content in untitled"
+
+
+class TestSplitView:
+    """Tests for split view functionality."""
+    
+    def test_initial_state_has_one_pane(self, qtbot):
+        """Test that editor starts with exactly one split pane."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        assert len(window.split_panes) == 1
+        assert window.active_pane is not None
+        assert window.active_pane in window.split_panes
+    
+    def test_add_split_view_creates_second_pane(self, qtbot):
+        """Test that clicking split creates a second pane."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        initial_count = len(window.split_panes)
+        window.add_split_view()
+        
+        assert len(window.split_panes) == initial_count + 1
+        assert len(window.split_panes) == 2
+    
+    def test_add_split_view_creates_third_pane(self, qtbot):
+        """Test that we can create up to 3 panes."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        window.add_split_view()
+        window.add_split_view()
+        
+        assert len(window.split_panes) == 3
+    
+    def test_max_three_split_panes(self, qtbot):
+        """Test that we cannot create more than 3 panes."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        window.add_split_view()
+        window.add_split_view()
+        window.add_split_view()  # Should be ignored
+        window.add_split_view()  # Should be ignored
+        
+        assert len(window.split_panes) == 3
+    
+    def test_split_button_disabled_at_max_panes(self, qtbot):
+        """Test that split button is disabled when at max panes."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        # Initially enabled
+        assert window.split_panes[0].tab_widget.split_button.isEnabled()
+        
+        window.add_split_view()
+        window.add_split_view()
+        
+        # At max, all split buttons should be disabled
+        for pane in window.split_panes:
+            assert not pane.tab_widget.split_button.isEnabled()
+    
+    def test_split_button_enabled_after_closing_pane(self, qtbot):
+        """Test that split button is re-enabled after closing a pane."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        window.add_split_view()
+        window.add_split_view()
+        
+        # At max, disabled
+        assert not window.split_panes[0].tab_widget.split_button.isEnabled()
+        
+        # Close one pane
+        pane_to_close = window.split_panes[1]
+        window.close_split_pane(pane_to_close)
+        
+        # Should be enabled again
+        for pane in window.split_panes:
+            assert pane.tab_widget.split_button.isEnabled()
+    
+    def test_close_button_hidden_with_one_pane(self, qtbot):
+        """Test that close button is hidden when only one pane exists."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        assert len(window.split_panes) == 1
+        assert not window.split_panes[0].close_button.isVisible()
+    
+    def test_close_button_visible_with_multiple_panes(self, qtbot):
+        """Test that close buttons are visible when multiple panes exist."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        window.add_split_view()
+        
+        # Check that close buttons are not hidden (visibility state)
+        for pane in window.split_panes:
+            assert not pane.close_button.isHidden()
+    
+    def test_close_button_hidden_after_returning_to_one_pane(self, qtbot):
+        """Test that close button hides when returning to one pane."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        window.add_split_view()
+        assert not window.split_panes[0].close_button.isHidden()
+        
+        # Close one pane
+        pane_to_close = window.split_panes[1]
+        window.close_split_pane(pane_to_close)
+        
+        assert len(window.split_panes) == 1
+        assert window.split_panes[0].close_button.isHidden()
+    
+    def test_close_split_pane_removes_pane(self, qtbot):
+        """Test that closing a split pane removes it from the list."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        window.add_split_view()
+        assert len(window.split_panes) == 2
+        
+        pane_to_close = window.split_panes[1]
+        window.close_split_pane(pane_to_close)
+        
+        assert len(window.split_panes) == 1
+        assert pane_to_close not in window.split_panes
+    
+    def test_cannot_close_last_pane(self, qtbot):
+        """Test that we cannot close the last remaining pane."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        assert len(window.split_panes) == 1
+        
+        # Try to close the only pane
+        window.close_split_pane(window.split_panes[0])
+        
+        # Should still have one pane
+        assert len(window.split_panes) == 1
+    
+    def test_each_pane_has_independent_tabs(self, qtbot):
+        """Test that each pane has its own independent tab widget."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        window.add_split_view()
+        
+        pane1 = window.split_panes[0]
+        pane2 = window.split_panes[1]
+        
+        # They should have different tab widgets
+        assert pane1.tab_widget is not pane2.tab_widget
+        
+        # Add content to pane1
+        window.set_active_pane(pane1)
+        window.editor.setPlainText("Pane 1 content")
+        
+        # Add content to pane2
+        window.set_active_pane(pane2)
+        window.editor.setPlainText("Pane 2 content")
+        
+        # Content should be different
+        assert pane1.tab_widget.widget(0).toPlainText() == "Pane 1 content"
+        assert pane2.tab_widget.widget(0).toPlainText() == "Pane 2 content"
+    
+    def test_new_pane_gets_new_tab(self, qtbot):
+        """Test that a new pane is created with an initial tab."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        window.add_split_view()
+        
+        new_pane = window.split_panes[1]
+        assert new_pane.tab_widget.count() >= 1
+    
+    def test_active_pane_switches_on_add(self, qtbot):
+        """Test that the new pane becomes active when created."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        original_pane = window.active_pane
+        window.add_split_view()
+        
+        # Active pane should now be the new one
+        assert window.active_pane != original_pane
+        assert window.active_pane == window.split_panes[1]
+    
+    def test_closing_all_tabs_removes_pane_when_multiple(self, qtbot):
+        """Test that closing all tabs in a pane removes the pane when there are multiple panes."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        # Create a second pane
+        window.add_split_view()
+        assert len(window.split_panes) == 2
+        
+        # The new pane should be active with one tab
+        active_pane = window.active_pane
+        assert window.tab_widget.count() == 1
+        
+        # Close the only tab in the active pane
+        window.remove_tab(0)
+        
+        # The pane should have been removed
+        assert len(window.split_panes) == 1
+        assert active_pane not in window.split_panes
+    
+    def test_closing_all_tabs_shows_welcome_when_one_pane(self, qtbot):
+        """Test that closing all tabs shows welcome screen when only one pane."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        assert len(window.split_panes) == 1
+        
+        # Close the only tab
+        window.remove_tab(0)
+        
+        # Should still have one pane but show welcome screen
+        assert len(window.split_panes) == 1
+        assert not window.welcome_screen.isHidden()
+        assert window.tab_widget.isHidden()
+    
+    def test_pane_count_decreases_when_closing_tabs(self, qtbot):
+        """Test that pane count properly decreases when all tabs are closed."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        # Create 3 panes
+        window.add_split_view()
+        window.add_split_view()
+        assert len(window.split_panes) == 3
+        
+        # Close all tabs in the active pane (which should be the 3rd one)
+        window.remove_tab(0)
+        assert len(window.split_panes) == 2
+        
+        # Close all tabs in the now-active pane
+        window.remove_tab(0)
+        assert len(window.split_panes) == 1
+        
+        # Closing tabs in the last pane should show welcome, not remove pane
+        window.remove_tab(0)
+        assert len(window.split_panes) == 1
+        assert not window.welcome_screen.isHidden()
+    
+    def test_split_pane_has_file_label(self, qtbot):
+        """Test that each split pane has a file label in the header."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        pane = window.split_panes[0]
+        assert hasattr(pane, 'file_label')
+        assert pane.file_label is not None
+    
+    def test_file_label_updates_on_tab_change(self, qtbot, tmp_path):
+        """Test that the pane header updates when switching tabs."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        # Create a file and load it
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("content")
+        window.load_file(str(test_file))
+        
+        pane = window.split_panes[0]
+        assert "test.txt" in pane.file_label.text()
+    
+    def test_split_view_with_file_operations(self, qtbot, tmp_path):
+        """Test that file operations work correctly with split views."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        # Create test files
+        file1 = tmp_path / "file1.txt"
+        file2 = tmp_path / "file2.txt"
+        file1.write_text("File 1 content")
+        file2.write_text("File 2 content")
+        
+        # Load file1 in first pane
+        window.load_file(str(file1))
+        
+        # Create second pane and load file2
+        window.add_split_view()
+        window.load_file(str(file2))
+        
+        # Verify each pane has correct content
+        pane1 = window.split_panes[0]
+        pane2 = window.split_panes[1]
+        
+        assert pane1.tab_widget.widget(0).toPlainText() == "File 1 content"
+        assert pane2.tab_widget.widget(0).toPlainText() == "File 2 content"
+    
+    def test_closing_pane_with_modified_content_prompts(self, qtbot, monkeypatch):
+        """Test that closing a pane with unsaved changes prompts user."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        window.add_split_view()
+        
+        # Modify content in the new pane
+        window.editor.setPlainText("unsaved changes")
+        window.editor.document().setModified(True)
+        
+        # Mock the message box to return Discard
+        monkeypatch.setattr(
+            "main.QMessageBox.warning",
+            lambda *args, **kwargs: QMessageBox.Discard
+        )
+        
+        pane_to_close = window.active_pane
+        window.close_split_pane(pane_to_close)
+        
+        # Pane should be closed
+        assert pane_to_close not in window.split_panes
+    
+    def test_closing_pane_cancel_keeps_pane(self, qtbot, monkeypatch):
+        """Test that canceling close keeps the pane open."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        window.add_split_view()
+        
+        # Modify content
+        window.editor.setPlainText("unsaved changes")
+        window.editor.document().setModified(True)
+        
+        # Mock the message box to return Cancel
+        monkeypatch.setattr(
+            "main.QMessageBox.warning",
+            lambda *args, **kwargs: QMessageBox.Cancel
+        )
+        
+        pane_count_before = len(window.split_panes)
+        pane_to_close = window.active_pane
+        window.close_split_pane(pane_to_close)
+        
+        # Pane should still exist
+        assert len(window.split_panes) == pane_count_before
+        assert pane_to_close in window.split_panes
