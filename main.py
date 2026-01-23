@@ -153,6 +153,10 @@ class CustomTabWidget(QTabWidget):
     
     def set_split_enabled(self, enabled):
         self.split_button.setEnabled(enabled)
+        if enabled:
+            self.split_button.setToolTip("Split Editor")
+        else:
+            self.split_button.setToolTip("Maximum views reached")
 
 
 class SplitEditorPane(QWidget):
@@ -310,6 +314,23 @@ class CodeEditor(QPlainTextEdit):
             selection.cursor.clearSelection()
             extra_selections.append(selection)
         self.setExtraSelections(extra_selections)
+    
+    def keyPressEvent(self, event):
+        """Handle key press events, including special behavior for down arrow on last line."""
+        if event.key() == Qt.Key_Down:
+            cursor = self.textCursor()
+            # Check if we're on the last block
+            current_block = cursor.block()
+            next_block = current_block.next()
+            
+            if not next_block.isValid():
+                # We're on the last line, move cursor to end of line instead
+                cursor.movePosition(QTextCursor.EndOfLine)
+                self.setTextCursor(cursor)
+                return
+        
+        # For all other keys, use default behavior
+        super().keyPressEvent(event)
     
     def line_number_area_paint_event(self, event):
         painter = QPainter(self.line_number_area)
@@ -492,6 +513,27 @@ class SearchResultButton(QWidget):
     def open_file(self):
         """Open the file in the text editor."""
         self.text_editor.open_file_with_line(self.file_path, self.line_num, self.match_text, self.match_start)
+        
+        # Close the parent dialogs (MultiFileSearchResultsDialog and MultiFileSearchDialog)
+        parent = self.parent()
+        results_dialog = None
+        search_dialog = None
+        
+        # Find both dialogs in the parent hierarchy
+        while parent:
+            if isinstance(parent, MultiFileSearchResultsDialog) and not results_dialog:
+                results_dialog = parent
+            elif isinstance(parent, MultiFileSearchDialog) and not search_dialog:
+                search_dialog = parent
+            parent = parent.parent()
+        
+        # Close results dialog first
+        if results_dialog:
+            results_dialog.close()
+        
+        # Close search dialog
+        if search_dialog:
+            search_dialog.close()
 
 
 class MultiFileSearchResultsDialog(QDialog):

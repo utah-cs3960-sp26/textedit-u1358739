@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from PySide6.QtCore import Qt, QPoint, QTimer, QDir
 from PySide6.QtGui import QTextCursor, QFont
-from PySide6.QtWidgets import QApplication, QMessageBox, QFileDialog
+from PySide6.QtWidgets import QApplication, QMessageBox, QFileDialog, QScrollArea
 from unittest.mock import patch
 
 from main import TextEditor, CodeEditor, FindReplaceDialog, LineNumberArea, CustomTabWidget, CustomTabBar
@@ -3167,3 +3167,135 @@ class TestMultiFileSearchBugFix:
             assert len(warning_called) == 0, "Should NOT show warning for default folder on startup (indicates bug not fixed)"
         finally:
             window.close()
+
+
+class TestSplitViewButton:
+    """Tests for split view button tooltip."""
+    
+    def test_split_button_shows_max_views_tooltip_when_disabled(self, qtbot):
+        """Test that split button shows 'Maximum views reached' tooltip when disabled."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Initially split button should be enabled with "Split Editor" tooltip
+        assert window.tab_widget.split_button.isEnabled()
+        assert window.tab_widget.split_button.toolTip() == "Split Editor"
+        
+        # Create splits until we reach the max
+        for i in range(window.MAX_SPLIT_PANES - 1):
+            window.create_split_pane()
+        
+        # After reaching max panes, split button should be disabled with new tooltip
+        assert not window.tab_widget.split_button.isEnabled()
+        assert window.tab_widget.split_button.toolTip() == "Maximum views reached"
+        
+        # Close a pane to re-enable it
+        window.close_split_pane(window.split_panes[0])
+        
+        # Button should be enabled again with original tooltip
+        assert window.tab_widget.split_button.isEnabled()
+        assert window.tab_widget.split_button.toolTip() == "Split Editor"
+
+
+class TestCursorBehavior:
+    """Tests for cursor behavior."""
+    
+    def test_press_down_on_last_line_goes_to_end(self, qtbot):
+        """Test that pressing down on the last line moves cursor to end of that line."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        
+        # Set text with last line that has content before cursor position
+        editor.setPlainText("Line 1\nLine 2")
+        
+        # Move cursor to beginning of last line
+        cursor = editor.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.StartOfLine)
+        editor.setTextCursor(cursor)
+        
+        # Verify cursor is at start of last line
+        assert cursor.blockNumber() == 1
+        assert cursor.positionInBlock() == 0
+        
+        # Simulate pressing down arrow key
+        from PySide6.QtGui import QKeyEvent
+        from PySide6.QtCore import Qt
+        down_event = QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Down, Qt.NoModifier)
+        editor.keyPressEvent(down_event)
+        
+        # Cursor should be at end of line since it's the last line
+        cursor = editor.textCursor()
+        assert cursor.blockNumber() == 1, "Should still be on last line"
+        assert cursor.positionInBlock() == 6, f"Should be at end of line (position 6), but is at {cursor.positionInBlock()}"
+
+
+class TestMultiFileSearchResultsDialog:
+    """Tests for multifile search results dialog."""
+    
+    def test_search_result_button_closes_all_dialogs(self, qtbot, tmp_path):
+        """Test that clicking a search result button closes both the results dialog and find dialog."""
+        # Create test files
+        test_file1 = tmp_path / "file1.txt"
+        test_file1.write_text("hello world\ntest content")
+        
+        # Create main editor window
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Set file model to temp directory
+        window.file_model.setRootPath(str(tmp_path))
+        
+        # Import classes we need
+        from main import MultiFileSearchResultsDialog, MultiFileSearchDialog
+        
+        # Create the search dialog (the one with find/replace inputs)
+        search_dialog = MultiFileSearchDialog(str(tmp_path), window)
+        qtbot.addWidget(search_dialog)
+        search_dialog.show()
+        qtbot.waitExposed(search_dialog)
+        
+        # Verify search dialog is visible
+        assert search_dialog.isVisible()
+        
+        # Create search results manually with search_dialog as parent
+        results = [
+            (str(test_file1), 1, "hello world\n", 0, "hello")
+        ]
+        
+        # Create the results dialog with search_dialog as parent
+        results_dialog = MultiFileSearchResultsDialog(results, window, search_dialog)
+        qtbot.addWidget(results_dialog)
+        results_dialog.show()
+        qtbot.waitExposed(results_dialog)
+        
+        # Verify dialogs are visible
+        assert results_dialog.isVisible()
+        assert search_dialog.isVisible()
+        
+        # Get the first search result button
+        scroll_area = results_dialog.findChild(QScrollArea)
+        assert scroll_area is not None
+        
+        # Get the button widget from scroll area
+        scroll_widget = scroll_area.widget()
+        layout = scroll_widget.layout()
+        assert layout.count() > 0
+        
+        # Get the first button (search result)
+        button_widget = layout.itemAt(0).widget()
+        assert button_widget is not None
+        
+        # Click the button (simulate user clicking on a search result)
+        qtbot.mouseClick(button_widget, Qt.LeftButton)
+        
+        # Give Qt time to process the close event
+        qtbot.wait(100)
+        
+        # Verify both dialogs are closed
+        assert not results_dialog.isVisible(), "Results dialog should be closed"
+        assert not search_dialog.isVisible(), "Search dialog should be closed"
