@@ -95,12 +95,36 @@ class CustomTabWidget(QTabWidget):
     """Custom tab widget that manages file tabs."""
     
     close_requested = Signal(int)
+    split_requested = Signal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.tab_bar = CustomTabBar(self)
         self.setTabBar(self.tab_bar)
         self.tab_bar.close_requested.connect(self.on_tab_close_requested)
+        
+        # Add split view button to corner
+        self.split_button = QPushButton("⊞")
+        self.split_button.setToolTip("Split Editor")
+        self.split_button.setFixedSize(28, 28)
+        self.split_button.clicked.connect(self.split_requested.emit)
+        self.split_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2d2d30;
+                color: #cccccc;
+                border: 1px solid #3e3e42;
+                border-radius: 3px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #3e3e42;
+            }
+            QPushButton:disabled {
+                color: #555555;
+            }
+        """)
+        self.setCornerWidget(self.split_button, Qt.TopRightCorner)
+        
         self.setStyleSheet("""
             QTabBar::tab {
                 background-color: #2d2d30;
@@ -125,6 +149,80 @@ class CustomTabWidget(QTabWidget):
     
     def on_tab_close_requested(self, index):
         self.close_requested.emit(index)
+    
+    def set_split_enabled(self, enabled):
+        self.split_button.setEnabled(enabled)
+
+
+class SplitEditorPane(QWidget):
+    """A split view pane containing a tab widget with a close button."""
+    
+    close_pane_requested = Signal(object)
+    tab_close_requested = Signal(object, int)
+    tab_changed = Signal(object, int)
+    split_requested = Signal()
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.init_ui()
+    
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Header with file name and close button
+        header = QWidget()
+        header.setStyleSheet("background-color: #2d2d30;")
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(5, 2, 5, 2)
+        header_layout.setSpacing(5)
+        
+        self.file_label = QLabel("Untitled")
+        self.file_label.setStyleSheet("color: #cccccc; font-weight: bold;")
+        header_layout.addWidget(self.file_label)
+        
+        header_layout.addStretch()
+        
+        self.close_button = QPushButton("×")
+        self.close_button.setToolTip("Close Split")
+        self.close_button.setFixedSize(20, 20)
+        self.close_button.clicked.connect(lambda: self.close_pane_requested.emit(self))
+        self.close_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #cccccc;
+                border: none;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #c42b1c;
+                color: white;
+                border-radius: 3px;
+            }
+        """)
+        header_layout.addWidget(self.close_button)
+        
+        layout.addWidget(header)
+        
+        # Tab widget for this pane
+        self.tab_widget = CustomTabWidget()
+        self.tab_widget.close_requested.connect(lambda idx: self.tab_close_requested.emit(self, idx))
+        self.tab_widget.currentChanged.connect(lambda idx: self.tab_changed.emit(self, idx))
+        self.tab_widget.split_requested.connect(self.split_requested.emit)
+        layout.addWidget(self.tab_widget)
+        
+        # Welcome screen for this pane
+        self.welcome_screen = WelcomeScreen()
+        self.welcome_screen.hide()
+        layout.addWidget(self.welcome_screen)
+    
+    def set_close_visible(self, visible):
+        self.close_button.setVisible(visible)
+    
+    def update_file_label(self, text):
+        self.file_label.setText(text)
 
 
 class LineNumberArea(QWidget):
@@ -299,13 +397,17 @@ class FindReplaceDialog(QDialog):
 class TextEditor(QMainWindow):
     """Main text editor window."""
     
+    MAX_SPLIT_PANES = 3
+    
     def __init__(self):
          super().__init__()
          self.current_file = None
-         self.open_files = {}  # Maps file path to tab index
+         self.open_files = {}  # Maps file path to (pane, tab_index)
          self.file_modified_state = {}  # Tracks if each file is modified
          self.zoom_indicator_timer = QTimer()
          self.zoom_indicator_timer.timeout.connect(self.hide_zoom_indicator)
+         self.split_panes = []  # List of SplitEditorPane objects
+         self.active_pane = None  # Currently focused pane
          self.init_ui()
          self.apply_dark_theme()
          # Focus on editor so user can start typing immediately
@@ -370,30 +472,29 @@ class TextEditor(QMainWindow):
         
         self.update_folder_label(QDir.currentPath())
         
-        # Editor with tabs
-        self.tab_widget = CustomTabWidget()
-        self.tab_widget.close_requested.connect(self.close_tab)
-        self.tab_widget.currentChanged.connect(self.on_tab_changed)
+        # Splitter for split views (horizontal)
+        self.editor_splitter = QSplitter(Qt.Horizontal)
+        self.editor_splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #3c3c3c;
+                width: 2px;
+            }
+        """)
         
-        # Welcome screen (shown when no tabs)
-        self.welcome_screen = WelcomeScreen()
-        self.welcome_screen.open_file_clicked.connect(self.open_file)
-        self.welcome_screen.new_file_clicked.connect(self.new_file_without_tab_check)
-        self.welcome_screen.hide()
+        # Create initial pane
+        initial_pane = self.create_split_pane()
+        self.editor_splitter.addWidget(initial_pane)
+        self.active_pane = initial_pane
         
-        # Container for tab widget and welcome screen
-        editor_container = QWidget()
-        editor_layout = QVBoxLayout(editor_container)
-        editor_layout.setContentsMargins(0, 0, 0, 0)
-        editor_layout.setSpacing(0)
-        editor_layout.addWidget(self.tab_widget)
-        editor_layout.addWidget(self.welcome_screen)
+        # For backwards compatibility
+        self.tab_widget = initial_pane.tab_widget
+        self.welcome_screen = initial_pane.welcome_screen
         
         # Create initial untitled editor
         self.create_new_tab()
         
         splitter.addWidget(sidebar_widget)
-        splitter.addWidget(editor_container)
+        splitter.addWidget(self.editor_splitter)
         splitter.setSizes([200, 1000])
         
         main_layout.addWidget(splitter)
@@ -654,6 +755,148 @@ class TextEditor(QMainWindow):
         """
         self.setStyleSheet(dark_style)
     
+    def create_split_pane(self):
+        """Create a new split editor pane."""
+        pane = SplitEditorPane()
+        pane.close_pane_requested.connect(self.close_split_pane)
+        pane.tab_close_requested.connect(self.close_tab_in_pane)
+        pane.tab_changed.connect(self.on_pane_tab_changed)
+        pane.split_requested.connect(self.add_split_view)
+        pane.welcome_screen.open_file_clicked.connect(self.open_file)
+        pane.welcome_screen.new_file_clicked.connect(self.new_file_without_tab_check)
+        
+        self.split_panes.append(pane)
+        self.update_split_button_state()
+        self.update_pane_close_buttons()
+        return pane
+    
+    def add_split_view(self):
+        """Add a new split view pane."""
+        if len(self.split_panes) >= self.MAX_SPLIT_PANES:
+            return
+        
+        new_pane = self.create_split_pane()
+        self.editor_splitter.addWidget(new_pane)
+        
+        # Create an initial tab in the new pane
+        self.active_pane = new_pane
+        self.tab_widget = new_pane.tab_widget
+        self.welcome_screen = new_pane.welcome_screen
+        self.create_new_tab()
+        
+        # Distribute space evenly
+        sizes = [1000] * len(self.split_panes)
+        self.editor_splitter.setSizes(sizes)
+        
+        self.update_split_button_state()
+        self.update_pane_close_buttons()
+    
+    def close_split_pane(self, pane):
+        """Close a split pane."""
+        if len(self.split_panes) <= 1:
+            return
+        
+        # Check for unsaved changes in all tabs of this pane
+        tab_widget = pane.tab_widget
+        for i in range(tab_widget.count()):
+            editor = tab_widget.widget(i)
+            if editor and editor.document().isModified():
+                ret = QMessageBox.warning(
+                    self, "TextEdit",
+                    "The document has been modified.\nDo you want to save your changes?",
+                    QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
+                )
+                if ret == QMessageBox.Save:
+                    # Temporarily set this as active to save
+                    old_tab_widget = self.tab_widget
+                    self.tab_widget = tab_widget
+                    self.tab_widget.setCurrentIndex(i)
+                    if not self.save_file():
+                        self.tab_widget = old_tab_widget
+                        return
+                    self.tab_widget = old_tab_widget
+                elif ret == QMessageBox.Cancel:
+                    return
+        
+        # Remove pane from tracking
+        self.split_panes.remove(pane)
+        
+        # Update open_files to remove files from this pane
+        files_to_remove = []
+        for file_path, (p, idx) in list(self.open_files.items()):
+            if p == pane:
+                files_to_remove.append(file_path)
+        for file_path in files_to_remove:
+            del self.open_files[file_path]
+        
+        # If active pane is being closed, switch to another
+        if self.active_pane == pane:
+            self.active_pane = self.split_panes[0]
+            self.tab_widget = self.active_pane.tab_widget
+            self.welcome_screen = self.active_pane.welcome_screen
+            if self.tab_widget.count() > 0:
+                self.editor = self.tab_widget.currentWidget()
+        
+        # Remove widget
+        pane.setParent(None)
+        pane.deleteLater()
+        
+        self.update_split_button_state()
+        self.update_pane_close_buttons()
+    
+    def update_split_button_state(self):
+        """Enable/disable split buttons based on pane count."""
+        enabled = len(self.split_panes) < self.MAX_SPLIT_PANES
+        for pane in self.split_panes:
+            pane.tab_widget.set_split_enabled(enabled)
+    
+    def update_pane_close_buttons(self):
+        """Show/hide close buttons based on pane count."""
+        show_close = len(self.split_panes) > 1
+        for pane in self.split_panes:
+            pane.set_close_visible(show_close)
+    
+    def close_tab_in_pane(self, pane, index):
+        """Close a tab in a specific pane."""
+        # Temporarily set this pane as active
+        old_tab_widget = self.tab_widget
+        old_welcome = self.welcome_screen
+        old_active = self.active_pane
+        
+        self.active_pane = pane
+        self.tab_widget = pane.tab_widget
+        self.welcome_screen = pane.welcome_screen
+        
+        self.close_tab(index)
+        
+        # Restore if we didn't switch panes
+        if self.active_pane == pane:
+            self.tab_widget = old_tab_widget
+            self.welcome_screen = old_welcome
+            self.active_pane = old_active
+    
+    def on_pane_tab_changed(self, pane, index):
+        """Handle tab change in a pane."""
+        # Set this pane as active
+        self.active_pane = pane
+        self.tab_widget = pane.tab_widget
+        self.welcome_screen = pane.welcome_screen
+        
+        # Update the file label in the pane header
+        if index >= 0:
+            tab_text = self.tab_widget.tabText(index)
+            pane.update_file_label(tab_text)
+        
+        self.on_tab_changed(index)
+    
+    def set_active_pane(self, pane):
+        """Set a pane as the active pane."""
+        self.active_pane = pane
+        self.tab_widget = pane.tab_widget
+        self.welcome_screen = pane.welcome_screen
+        if self.tab_widget.count() > 0:
+            self.editor = self.tab_widget.currentWidget()
+    
     def create_new_tab(self, file_path=None):
         """Create a new editor tab."""
         editor = CodeEditor()
@@ -673,12 +916,17 @@ class TextEditor(QMainWindow):
         
         index = self.tab_widget.addTab(editor, tab_name)
         if file_path:
-            self.open_files[file_path] = index
+            self.open_files[file_path] = (self.active_pane, index)
             self.file_modified_state[file_path] = False
         
         self.tab_widget.setCurrentIndex(index)
         self.current_file = file_path
         self.editor = editor
+        
+        # Update pane header
+        if self.active_pane:
+            self.active_pane.update_file_label(tab_name)
+        
         # Focus on editor so user can start typing immediately
         editor.setFocus()
         return editor, file_path
@@ -689,8 +937,13 @@ class TextEditor(QMainWindow):
              self.editor = self.tab_widget.widget(index)
              # Find the file path for this tab
              new_current_file = None
-             for file_path, tab_index in self.open_files.items():
-                 if tab_index == index:
+             for file_path, pane_info in self.open_files.items():
+                 if isinstance(pane_info, tuple):
+                     pane, tab_index = pane_info
+                     if pane == self.active_pane and tab_index == index:
+                         new_current_file = file_path
+                         break
+                 elif pane_info == index:
                      new_current_file = file_path
                      break
              
@@ -734,8 +987,13 @@ class TextEditor(QMainWindow):
         """Save the file for a specific tab (may not be the current tab)."""
         # Find the file path for this tab
         file_path = None
-        for path, tab_idx in self.open_files.items():
-            if tab_idx == index:
+        for path, pane_info in self.open_files.items():
+            if isinstance(pane_info, tuple):
+                pane, tab_idx = pane_info
+                if pane == self.active_pane and tab_idx == index:
+                    file_path = path
+                    break
+            elif pane_info == index:
                 file_path = path
                 break
         
@@ -761,7 +1019,7 @@ class TextEditor(QMainWindow):
                         f.write(editor.toPlainText())
                     editor.document().setModified(False)
                     # Track the new file
-                    self.open_files[file_path] = index
+                    self.open_files[file_path] = (self.active_pane, index)
                     self.tab_widget.setTabText(index, os.path.basename(file_path))
                     return True
                 except Exception as e:
@@ -772,8 +1030,15 @@ class TextEditor(QMainWindow):
     def remove_tab(self, index):
         """Remove a tab without prompting."""
         # Find and remove from open_files dict
-        for file_path, tab_idx in list(self.open_files.items()):
-            if tab_idx == index:
+        for file_path, pane_info in list(self.open_files.items()):
+            if isinstance(pane_info, tuple):
+                pane, tab_idx = pane_info
+                if pane == self.active_pane and tab_idx == index:
+                    del self.open_files[file_path]
+                    if file_path in self.file_modified_state:
+                        del self.file_modified_state[file_path]
+                    break
+            elif pane_info == index:
                 del self.open_files[file_path]
                 if file_path in self.file_modified_state:
                     del self.file_modified_state[file_path]
@@ -781,9 +1046,13 @@ class TextEditor(QMainWindow):
         
         # Update indices in open_files for tabs after the removed one BEFORE removing
         # This ensures on_tab_changed can find the correct file when it fires
-        for file_path, tab_idx in list(self.open_files.items()):
-            if tab_idx > index:
-                self.open_files[file_path] = tab_idx - 1
+        for file_path, pane_info in list(self.open_files.items()):
+            if isinstance(pane_info, tuple):
+                pane, tab_idx = pane_info
+                if pane == self.active_pane and tab_idx > index:
+                    self.open_files[file_path] = (pane, tab_idx - 1)
+            elif pane_info > index:
+                self.open_files[file_path] = pane_info - 1
         
         # Remove the tab (this triggers on_tab_changed)
         self.tab_widget.removeTab(index)
@@ -794,6 +1063,9 @@ class TextEditor(QMainWindow):
             self.welcome_screen.show()
             self.current_file = None
             self.setWindowTitle("TextEdit")
+            # Update pane header
+            if self.active_pane:
+                self.active_pane.update_file_label("No file")
     
     def save_current_file(self):
         """Save the current file."""
@@ -902,7 +1174,12 @@ class TextEditor(QMainWindow):
                         break
                 
                 if matching_file:
-                     tab_index = self.open_files[matching_file]
+                     pane_info = self.open_files[matching_file]
+                     if isinstance(pane_info, tuple):
+                         pane, tab_index = pane_info
+                     else:
+                         pane = self.active_pane
+                         tab_index = pane_info
                      # Mark this file as deleted so on_tab_changed won't restore it
                      was_current = (self.current_file == matching_file)
                      # Remove from tracking before removing tab so on_tab_changed won't find it
@@ -910,16 +1187,23 @@ class TextEditor(QMainWindow):
                      if matching_file in self.file_modified_state:
                          del self.file_modified_state[matching_file]
                      # Now remove the tab (on_tab_changed will see file not in open_files)
-                     if self.tab_widget.count() == 1:
-                         self.tab_widget.removeTab(tab_index)
+                     target_tab_widget = pane.tab_widget if pane else self.tab_widget
+                     if target_tab_widget.count() == 1:
+                         target_tab_widget.removeTab(tab_index)
+                         old_tab_widget = self.tab_widget
+                         self.tab_widget = target_tab_widget
                          self.create_new_tab()
+                         self.tab_widget = old_tab_widget
                      else:
-                         self.tab_widget.removeTab(tab_index)
+                         target_tab_widget.removeTab(tab_index)
                          # Update indices in open_files for tabs after the removed one
-                         for i in range(tab_index, self.tab_widget.count()):
-                             for open_file_path, tab_idx in list(self.open_files.items()):
-                                 if tab_idx > tab_index:
-                                     self.open_files[open_file_path] = tab_idx - 1
+                         for open_file_path, info in list(self.open_files.items()):
+                             if isinstance(info, tuple):
+                                 p, idx = info
+                                 if p == pane and idx > tab_index:
+                                     self.open_files[open_file_path] = (p, idx - 1)
+                             elif info > tab_index:
+                                 self.open_files[open_file_path] = info - 1
                      # Ensure current_file is cleared if this was the current file
                      if was_current:
                          self.current_file = None
@@ -928,21 +1212,33 @@ class TextEditor(QMainWindow):
                     # Check if any open files are in the deleted directory
                     for open_file_path in list(self.open_files.keys()):
                         if open_file_path.startswith(file_path):
-                            tab_index = self.open_files[open_file_path]
+                            pane_info = self.open_files[open_file_path]
+                            if isinstance(pane_info, tuple):
+                                pane, tab_index = pane_info
+                            else:
+                                pane = self.active_pane
+                                tab_index = pane_info
                             del self.open_files[open_file_path]
                             if open_file_path in self.file_modified_state:
                                 del self.file_modified_state[open_file_path]
                             # Now remove the tab
-                            if self.tab_widget.count() == 1:
-                                self.tab_widget.removeTab(tab_index)
+                            target_tab_widget = pane.tab_widget if pane else self.tab_widget
+                            if target_tab_widget.count() == 1:
+                                target_tab_widget.removeTab(tab_index)
+                                old_tab_widget = self.tab_widget
+                                self.tab_widget = target_tab_widget
                                 self.create_new_tab()
+                                self.tab_widget = old_tab_widget
                             else:
-                                self.tab_widget.removeTab(tab_index)
+                                target_tab_widget.removeTab(tab_index)
                                 # Update indices in open_files for tabs after the removed one
-                                for i in range(tab_index, self.tab_widget.count()):
-                                    for other_file_path, tab_idx in list(self.open_files.items()):
-                                        if tab_idx > tab_index:
-                                            self.open_files[other_file_path] = tab_idx - 1
+                                for other_file_path, info in list(self.open_files.items()):
+                                    if isinstance(info, tuple):
+                                        p, idx = info
+                                        if p == pane and idx > tab_index:
+                                            self.open_files[other_file_path] = (p, idx - 1)
+                                    elif info > tab_index:
+                                        self.open_files[other_file_path] = info - 1
                 
                 # Refresh file model to stop watching the deleted path
                 root_path = self.file_model.rootPath()
@@ -952,12 +1248,19 @@ class TextEditor(QMainWindow):
     
     def load_file(self, file_path):
         try:
-            # Check if file is already open in a different tab
-            if file_path in self.open_files and self.open_files[file_path] != self.tab_widget.currentIndex():
-                # Switch to existing tab
-                tab_index = self.open_files[file_path]
-                self.tab_widget.setCurrentIndex(tab_index)
-                return
+            # Check if file is already open in a different tab (in any pane)
+            if file_path in self.open_files:
+                pane_info = self.open_files[file_path]
+                if isinstance(pane_info, tuple):
+                    pane, tab_index = pane_info
+                    # Only switch if in a different pane or different tab
+                    if pane != self.active_pane or tab_index != self.tab_widget.currentIndex():
+                        self.set_active_pane(pane)
+                        self.tab_widget.setCurrentIndex(tab_index)
+                        return
+                elif pane_info != self.tab_widget.currentIndex():
+                    self.tab_widget.setCurrentIndex(pane_info)
+                    return
             
             # Load file content
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -970,7 +1273,7 @@ class TextEditor(QMainWindow):
             if current_index >= 0 and self.current_file is None and not current_editor.document().isModified():
                 # Reuse current untitled tab
                 editor = current_editor
-                self.open_files[file_path] = current_index
+                self.open_files[file_path] = (self.active_pane, current_index)
                 self.file_modified_state[file_path] = False
             elif file_path in self.open_files:
                 # File is already mapped to current tab, reuse it
@@ -984,7 +1287,12 @@ class TextEditor(QMainWindow):
             
             # Update tab title
             tab_index = self.tab_widget.currentIndex()
-            self.tab_widget.setTabText(tab_index, os.path.basename(file_path))
+            tab_name = os.path.basename(file_path)
+            self.tab_widget.setTabText(tab_index, tab_name)
+            
+            # Update pane header
+            if self.active_pane:
+                self.active_pane.update_file_label(tab_name)
             
             self.current_file = file_path
             self.setWindowTitle(f"TextEdit - {file_path}")
@@ -1015,7 +1323,7 @@ class TextEditor(QMainWindow):
             
             # Update open_files mapping if new file
             if file_path not in self.open_files:
-                self.open_files[file_path] = self.tab_widget.currentIndex()
+                self.open_files[file_path] = (self.active_pane, self.tab_widget.currentIndex())
             
             self.current_file = file_path
             self.setWindowTitle(f"TextEdit - {file_path}")
@@ -1023,7 +1331,12 @@ class TextEditor(QMainWindow):
             
             # Update tab title to remove asterisk
             tab_index = self.tab_widget.currentIndex()
-            self.tab_widget.setTabText(tab_index, os.path.basename(file_path))
+            tab_name = os.path.basename(file_path)
+            self.tab_widget.setTabText(tab_index, tab_name)
+            
+            # Update pane header
+            if self.active_pane:
+                self.active_pane.update_file_label(tab_name)
             
             self.update_file_type(file_path)
             return True
@@ -1055,9 +1368,15 @@ class TextEditor(QMainWindow):
         if tab_index >= 0:
             tab_title = self.tab_widget.tabText(tab_index)
             if self.editor.document().isModified() and not tab_title.endswith("*"):
-                self.tab_widget.setTabText(tab_index, tab_title + " *")
+                new_title = tab_title + " *"
+                self.tab_widget.setTabText(tab_index, new_title)
+                if self.active_pane:
+                    self.active_pane.update_file_label(new_title)
             elif not self.editor.document().isModified() and tab_title.endswith("*"):
-                self.tab_widget.setTabText(tab_index, tab_title.rstrip("*").rstrip())
+                new_title = tab_title.rstrip("*").rstrip()
+                self.tab_widget.setTabText(tab_index, new_title)
+                if self.active_pane:
+                    self.active_pane.update_file_label(new_title)
     
     def update_cursor_position(self):
          if not hasattr(self, 'cursor_label') or self.editor is None:

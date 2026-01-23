@@ -23,5 +23,5 @@ Scroll bar doesn't look that great.
 // Fixed  When I make changes to the untitled file that is up at first, then it doesn't save them.
 // Made so the cursor is focused on opening a file so the user can immediately start typing.
 
-Implement split view.
+// Implemented  Split view with up to 3 panes, close buttons for each pane, and split button in tab bar.
 Implement multifile find and replace.
