@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QFileDialog, QMessageBox, QStatusBar, QMenuBar,
     QToolBar, QLabel, QLineEdit, QDialog, QPushButton, QSplitter,
     QTreeView, QFileSystemModel, QFrame, QTextEdit, QInputDialog, QMenu,
-    QTabWidget, QTabBar
+    QTabWidget, QTabBar, QStyle
 )
 from PySide6.QtGui import (
     QAction, QKeySequence, QFont, QColor, QPainter, QTextFormat,
@@ -104,23 +104,22 @@ class CustomTabWidget(QTabWidget):
         self.tab_bar.close_requested.connect(self.on_tab_close_requested)
         
         # Add split view button to corner
-        self.split_button = QPushButton("⊞")
+        self.split_button = QPushButton()
+        self.split_button.setIcon(self.style().standardIcon(QStyle.SP_TitleBarNormalButton))
         self.split_button.setToolTip("Split Editor")
         self.split_button.setFixedSize(28, 28)
         self.split_button.clicked.connect(self.split_requested.emit)
         self.split_button.setStyleSheet("""
             QPushButton {
-                background-color: #2d2d30;
-                color: #cccccc;
-                border: 1px solid #3e3e42;
-                border-radius: 3px;
-                font-size: 14px;
+                background-color: transparent;
+                border: none;
             }
             QPushButton:hover {
                 background-color: #3e3e42;
+                border-radius: 3px;
             }
             QPushButton:disabled {
-                color: #555555;
+                opacity: 0.3;
             }
         """)
         self.setCornerWidget(self.split_button, Qt.TopRightCorner)
@@ -184,21 +183,18 @@ class SplitEditorPane(QWidget):
         
         header_layout.addStretch()
         
-        self.close_button = QPushButton("×")
+        self.close_button = QPushButton()
+        self.close_button.setIcon(self.style().standardIcon(QStyle.SP_TitleBarCloseButton))
         self.close_button.setToolTip("Close Split")
-        self.close_button.setFixedSize(20, 20)
+        self.close_button.setFixedSize(24, 24)
         self.close_button.clicked.connect(lambda: self.close_pane_requested.emit(self))
         self.close_button.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
-                color: #cccccc;
                 border: none;
-                font-size: 16px;
-                font-weight: bold;
             }
             QPushButton:hover {
                 background-color: #c42b1c;
-                color: white;
                 border-radius: 3px;
             }
         """)
