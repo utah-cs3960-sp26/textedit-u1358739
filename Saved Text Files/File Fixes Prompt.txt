@@ -1,1 +1,16 @@
-I have a file named "All Current Problems.txt" inside the folder named "Saved Text FIles".  Each line in that file is a description of something that I want changed.  I want you to go through that file and fix each of those things one by one.  If the line starts with "Bug: " then I want you to follow that process I mentioned earlier for fixing bugs.
+// Must
+// Implement multifile find and replace.
+
+Should
+// Scroll bar doesn't look that great.
+// When I press down when I am on the last line, the cursor doesn't go to the end of the line.  It just stays there.
+// When the split view button is disabled, then display maximun views reached when hovering over the button.
+Make so if a cursor is on that view, then that view is the active view and when a new file is opened it is opened in that view.
+// Make so when a file is already opened and I try to open it in a different view (open it when a different view is active), then it works and now has the file opened twice.
+Clicking on a tab doesn't move the cursor to that tab.
+
+Could
+Can't drag and drop a file or folder into another folder in the sidebar.
+Can't drag and drop tabs from one view over to another view.
+When there are too many tabs in a view it adds arrows that are not that cool.  I want a small horizontal scroll bar instead.
+Make so find and replace highlights all instances of the "find" and emphasizes the one that it is currently on.

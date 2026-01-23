@@ -255,6 +255,8 @@ class LineNumberArea(QWidget):
 class CodeEditor(QPlainTextEdit):
     """Text editor with line numbers and syntax highlighting."""
     
+    focusReceived = Signal()
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.line_number_area = LineNumberArea(self)
@@ -314,6 +316,11 @@ class CodeEditor(QPlainTextEdit):
             selection.cursor.clearSelection()
             extra_selections.append(selection)
         self.setExtraSelections(extra_selections)
+    
+    def focusInEvent(self, event):
+        """Emit focusReceived signal when this editor gets focus."""
+        super().focusInEvent(event)
+        self.focusReceived.emit()
     
     def keyPressEvent(self, event):
         """Handle key press events, including special behavior for down arrow on last line."""
@@ -1269,6 +1276,7 @@ class TextEditor(QMainWindow):
         editor = CodeEditor()
         editor.textChanged.connect(self.on_text_changed)
         editor.cursorPositionChanged.connect(self.update_cursor_position)
+        editor.focusReceived.connect(self.on_editor_focus_received)
         
         if file_path:
             tab_name = os.path.basename(file_path)
@@ -1787,6 +1795,28 @@ class TextEditor(QMainWindow):
          line = cursor.blockNumber() + 1
          col = cursor.columnNumber() + 1
          self.cursor_label.setText(f"Ln {line}, Col {col}")
+    
+    def on_editor_focus_received(self):
+         """Update active pane when an editor receives focus."""
+         editor = self.sender()
+         
+         # Find which pane contains the editor that just received focus
+         # First check the main tab_widget
+         for i in range(self.tab_widget.count()):
+              if self.tab_widget.widget(i) is editor:
+                   # Editor is in current active pane's tab_widget, ensure pane is active
+                   if self.active_pane and self.active_pane.tab_widget == self.tab_widget:
+                        return  # Already in active pane
+                   return
+         
+         # Check split panes
+         for pane in self.split_panes:
+              for i in range(pane.tab_widget.count()):
+                   if pane.tab_widget.widget(i) is editor:
+                        # Editor is in this pane, only switch if not already active
+                        if self.active_pane != pane:
+                             self.set_active_pane(pane)
+                        return
     
     def update_folder_label(self, folder_path):
         folder_name = os.path.basename(folder_path) or folder_path
