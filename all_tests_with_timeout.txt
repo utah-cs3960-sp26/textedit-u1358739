@@ -1,0 +1,390 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\umyea\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+PySide6 6.10.1 -- Qt runtime 6.10.1 -- Qt compiled 6.10.1
+rootdir: C:\Users\umyea\repos\textedit-u1358739
+configfile: pytest.ini
+plugins: qt-4.5.0, timeout-2.4.0
+timeout: 15.0s
+timeout method: thread
+timeout func_only: False
+collecting ... collected 219 items
+
+test_editor.py::TestCodeEditor::test_code_editor_creation PASSED         [  0%]
+test_editor.py::TestCodeEditor::test_line_number_area_exists PASSED      [  0%]
+test_editor.py::TestCodeEditor::test_line_number_area_width_single_digit PASSED [  1%]
+test_editor.py::TestCodeEditor::test_line_number_area_width_increases_with_lines PASSED [  1%]
+test_editor.py::TestCodeEditor::test_font_is_monospace PASSED            [  2%]
+test_editor.py::TestCodeEditor::test_tab_stop_distance_set PASSED        [  2%]
+test_editor.py::TestCodeEditor::test_text_insertion PASSED               [  3%]
+test_editor.py::TestCodeEditor::test_multiline_text PASSED               [  3%]
+test_editor.py::TestCodeEditor::test_cursor_position_updates PASSED      [  4%]
+test_editor.py::TestCodeEditor::test_highlight_current_line PASSED       [  4%]
+test_editor.py::TestCodeEditor::test_undo_redo PASSED                    [  5%]
+test_editor.py::TestCodeEditor::test_cut_copy_paste PASSED               [  5%]
+test_editor.py::TestCodeEditor::test_select_all PASSED                   [  5%]
+test_editor.py::TestCodeEditor::test_clear PASSED                        [  6%]
+test_editor.py::TestCodeEditor::test_resize_updates_line_number_area PASSED [  6%]
+test_editor.py::TestTextEditor::test_window_creation PASSED              [  7%]
+test_editor.py::TestTextEditor::test_initial_title_is_untitled PASSED    [  7%]
+test_editor.py::TestTextEditor::test_editor_exists PASSED                [  8%]
+test_editor.py::TestTextEditor::test_file_tree_exists PASSED             [  8%]
+test_editor.py::TestTextEditor::test_status_bar_exists PASSED            [  9%]
+test_editor.py::TestTextEditor::test_initial_cursor_position_label PASSED [  9%]
+test_editor.py::TestTextEditor::test_encoding_label_shows_utf8 PASSED    [ 10%]
+test_editor.py::TestTextEditor::test_menu_bar_exists PASSED              [ 10%]
+test_editor.py::TestTextEditor::test_file_menu_actions PASSED            [ 10%]
+test_editor.py::TestTextEditor::test_edit_menu_actions PASSED            [ 11%]
+test_editor.py::TestTextEditor::test_view_menu_actions PASSED            [ 11%]
+test_editor.py::TestTextEditor::test_new_folder_shortcut_configured PASSED [ 12%]
+test_editor.py::TestTextEditor::test_open_folder_shortcut_configured PASSED [ 12%]
+test_editor.py::TestTextEditor::test_dark_theme_applied PASSED           [ 13%]
+test_editor.py::TestTextEditor::test_new_file_clears_editor PASSED       [ 13%]
+test_editor.py::TestTextEditor::test_cursor_position_updates_on_move PASSED [ 14%]
+test_editor.py::TestTextEditor::test_text_changed_marks_modified PASSED  [ 14%]
+test_editor.py::TestTextEditor::test_toggle_sidebar_hides_file_tree PASSED [ 15%]
+test_editor.py::TestTextEditor::test_zoom_in_increases_font_size PASSED  [ 15%]
+test_editor.py::TestTextEditor::test_zoom_out_decreases_font_size PASSED [ 15%]
+test_editor.py::TestTextEditor::test_zoom_in_also_zooms_line_numbers PASSED [ 16%]
+test_editor.py::TestTextEditor::test_zoom_out_also_zooms_line_numbers PASSED [ 16%]
+test_editor.py::TestTextEditor::test_zoom_out_minimum_limit PASSED       [ 17%]
+test_editor.py::TestTextEditor::test_update_file_type_python PASSED      [ 17%]
+test_editor.py::TestTextEditor::test_update_file_type_javascript PASSED  [ 18%]
+test_editor.py::TestTextEditor::test_update_file_type_html PASSED        [ 18%]
+test_editor.py::TestTextEditor::test_update_file_type_css PASSED         [ 19%]
+test_editor.py::TestTextEditor::test_update_file_type_json PASSED        [ 19%]
+test_editor.py::TestTextEditor::test_update_file_type_markdown PASSED    [ 20%]
+test_editor.py::TestTextEditor::test_update_file_type_plain_text PASSED  [ 20%]
+test_editor.py::TestTextEditor::test_update_file_type_unknown PASSED     [ 21%]
+test_editor.py::TestFileOperations::test_save_to_file PASSED             [ 21%]
+test_editor.py::TestFileOperations::test_save_updates_window_title PASSED [ 21%]
+test_editor.py::TestFileOperations::test_save_clears_modified_flag PASSED [ 22%]
+test_editor.py::TestFileOperations::test_load_file PASSED                [ 22%]
+test_editor.py::TestFileOperations::test_load_file_updates_title PASSED  [ 23%]
+test_editor.py::TestFileOperations::test_load_file_updates_file_type PASSED [ 23%]
+test_editor.py::TestFileOperations::test_load_nonexistent_file_shows_error PASSED [ 24%]
+test_editor.py::TestFileOperations::test_save_file_calls_save_as_when_no_current_file PASSED [ 24%]
+test_editor.py::TestFileOperations::test_save_file_uses_current_file PASSED [ 25%]
+test_editor.py::TestFileOperations::test_maybe_save_returns_true_when_not_modified PASSED [ 25%]
+test_editor.py::TestFileOperations::test_maybe_save_with_discard PASSED  [ 26%]
+test_editor.py::TestFileOperations::test_maybe_save_with_cancel PASSED   [ 26%]
+test_editor.py::TestFileOperations::test_maybe_save_with_save PASSED     [ 26%]
+test_editor.py::TestFileOperations::test_save_unicode_content PASSED     [ 27%]
+test_editor.py::TestFileOperations::test_load_unicode_content PASSED     [ 27%]
+test_editor.py::TestFindReplaceDialog::test_dialog_creation PASSED       [ 28%]
+test_editor.py::TestFindReplaceDialog::test_dialog_has_find_input PASSED [ 28%]
+test_editor.py::TestFindReplaceDialog::test_dialog_has_replace_input PASSED [ 29%]
+test_editor.py::TestFindReplaceDialog::test_find_next_finds_text PASSED  [ 29%]
+test_editor.py::TestFindReplaceDialog::test_find_next_wraps_around PASSED [ 30%]
+test_editor.py::TestFindReplaceDialog::test_find_with_no_match PASSED    [ 30%]
+test_editor.py::TestFindReplaceDialog::test_replace_single PASSED        [ 31%]
+test_editor.py::TestFindReplaceDialog::test_replace_single_with_uppercase_replacement PASSED [ 31%]
+test_editor.py::TestFindReplaceDialog::test_replace_single_with_lowercase_replacement PASSED [ 31%]
+test_editor.py::TestFindReplaceDialog::test_replace_single_with_mixed_case_replacement PASSED [ 32%]
+test_editor.py::TestFindReplaceDialog::test_replace_single_finds_different_case PASSED [ 32%]
+test_editor.py::TestFindReplaceDialog::test_replace_all PASSED           [ 33%]
+test_editor.py::TestFindReplaceDialog::test_replace_empty_find_does_nothing PASSED [ 33%]
+test_editor.py::TestFindReplaceDialog::test_find_case_sensitive PASSED   [ 34%]
+test_editor.py::TestFindReplaceDialog::test_find_case_sensitive_exact_match PASSED [ 34%]
+test_editor.py::TestFindReplaceDialog::test_find_case_sensitive_no_match_different_case PASSED [ 35%]
+test_editor.py::TestFindReplaceDialog::test_replace_preserves_other_cases PASSED [ 35%]
+test_editor.py::TestFindReplaceDialog::test_replace_all_should_be_case_insensitive_like_find PASSED [ 36%]
+test_editor.py::TestFindReplaceDialog::test_replace_all_with_uppercase_replacement PASSED [ 36%]
+test_editor.py::TestFindReplaceDialog::test_replace_all_with_lowercase_replacement PASSED [ 36%]
+test_editor.py::TestFindReplaceDialog::test_replace_all_with_mixed_case_replacement PASSED [ 37%]
+test_editor.py::TestFindReplaceDialog::test_multiple_replace_all_operations PASSED [ 37%]
+test_editor.py::TestFindReplaceDialog::test_find_replace_marks_document_as_modified FAILED [ 38%]
+test_editor.py::TestFindReplaceDialog::test_replace_all_marks_document_as_modified FAILED [ 38%]
+test_editor.py::TestFindReplaceDialog::test_undo_after_replace_all PASSED [ 39%]
+test_editor.py::TestMenuLayout::test_menu_items_have_adequate_shortcut_padding PASSED [ 39%]
+test_editor.py::TestWindowGeometry::test_initial_window_fits_on_screen PASSED [ 40%]
+test_editor.py::TestKeyboardShortcuts::test_zoom_in_shortcut_is_ctrl_equals PASSED [ 40%]
+test_editor.py::TestKeyboardShortcuts::test_no_alternate_zoom_in_shortcut PASSED [ 41%]
+test_editor.py::TestKeyboardShortcuts::test_ctrl_n_new_file PASSED       [ 41%]
+test_editor.py::TestKeyboardShortcuts::test_ctrl_z_undo PASSED           [ 42%]
+test_editor.py::TestKeyboardShortcuts::test_ctrl_y_redo PASSED           [ 42%]
+test_editor.py::TestKeyboardShortcuts::test_ctrl_a_select_all PASSED     [ 42%]
+test_editor.py::TestKeyboardShortcuts::test_ctrl_b_toggle_sidebar PASSED [ 43%]
+test_editor.py::TestLineNumberArea::test_line_number_area_creation PASSED [ 43%]
+test_editor.py::TestLineNumberArea::test_size_hint PASSED                [ 44%]
+test_editor.py::TestEditorIntegration::test_full_edit_workflow PASSED    [ 44%]
+test_editor.py::TestEditorIntegration::test_create_edit_save_reopen PASSED [ 45%]
+test_editor.py::TestEditorIntegration::test_multiple_find_replace PASSED [ 45%]
+test_editor.py::TestEditorIntegration::test_zoom_persistence PASSED      [ 46%]
+test_editor.py::TestEditorIntegration::test_large_file_handling PASSED   [ 46%]
+test_editor.py::TestEditorIntegration::test_special_characters_in_filename PASSED [ 47%]
+test_editor.py::TestFolderLabelDisplay::test_folder_label_exists PASSED  [ 47%]
+test_editor.py::TestFolderLabelDisplay::test_folder_label_initially_displays_current_folder PASSED [ 47%]
+test_editor.py::TestFolderLabelDisplay::test_update_folder_label_with_simple_path PASSED [ 48%]
+test_editor.py::TestFolderLabelDisplay::test_update_folder_label_with_nested_path PASSED [ 48%]
+test_editor.py::TestFolderLabelDisplay::test_update_folder_label_with_root_path PASSED [ 49%]
+test_editor.py::TestFolderLabelDisplay::test_folder_label_updates_on_open_folder PASSED [ 49%]
+test_editor.py::TestFolderLabelDisplay::test_folder_label_shows_basename_only PASSED [ 50%]
+test_editor.py::TestFolderLabelDisplay::test_folder_label_handles_windows_paths PASSED [ 50%]
+test_editor.py::TestFolderLabelDisplay::test_folder_label_styling PASSED [ 51%]
+test_editor.py::TestFolderLabelDisplay::test_zoom_indicator_exists PASSED [ 51%]
+test_editor.py::TestFolderLabelDisplay::test_zoom_indicator_hidden_by_default PASSED [ 52%]
+test_editor.py::TestFolderLabelDisplay::test_zoom_indicator_shows_on_zoom_in PASSED [ 52%]
+test_editor.py::TestFolderLabelDisplay::test_zoom_indicator_shows_on_zoom_out PASSED [ 52%]
+test_editor.py::TestFolderLabelDisplay::test_zoom_indicator_displays_correct_percentage PASSED [ 53%]
+test_editor.py::TestFolderLabelDisplay::test_zoom_indicator_increases_on_zoom_in PASSED [ 53%]
+test_editor.py::TestFolderLabelDisplay::test_zoom_indicator_decreases_on_zoom_out PASSED [ 54%]
+test_editor.py::TestFolderLabelDisplay::test_zoom_indicator_doesnt_go_below_6pt PASSED [ 54%]
+test_editor.py::TestFolderLabelDisplay::test_zoom_indicator_timer_active_on_show PASSED [ 55%]
+test_editor.py::TestFolderLabelDisplay::test_zoom_indicator_auto_hides PASSED [ 55%]
+test_editor.py::TestFolderLabelDisplay::test_zoom_indicator_positioned_top_right PASSED [ 56%]
+test_editor.py::TestFolderOperations::test_open_folder_updates_file_tree PASSED [ 56%]
+test_editor.py::TestFolderOperations::test_new_folder_creates_directory PASSED [ 57%]
+test_editor.py::TestFolderOperations::test_new_folder_cancelled PASSED   [ 57%]
+test_editor.py::TestFolderOperations::test_new_folder_already_exists PASSED [ 57%]
+test_editor.py::TestFolderOperations::test_new_folder_empty_name PASSED  [ 58%]
+test_editor.py::TestFolderOperations::test_file_tree_root_path_after_open_folder PASSED [ 58%]
+test_editor.py::TestDeleteFunctionality::test_delete_file_from_tree PASSED [ 59%]
+test_editor.py::TestDeleteFunctionality::test_delete_folder_from_tree PASSED [ 59%]
+test_editor.py::TestDeleteFunctionality::test_delete_cancelled PASSED    [ 60%]
+test_editor.py::TestDeleteFunctionality::test_delete_currently_open_file PASSED [ 60%]
+test_editor.py::TestDeleteFunctionality::test_delete_nonexistent_file_error PASSED [ 61%]
+test_editor.py::TestEdgesCases::test_empty_file_save_load PASSED         [ 61%]
+test_editor.py::TestEdgesCases::test_very_long_line PASSED               [ 62%]
+test_editor.py::TestEdgesCases::test_rapid_typing PASSED                 [ 62%]
+test_editor.py::TestEdgesCases::test_cursor_at_end_of_document PASSED    [ 63%]
+test_editor.py::TestEdgesCases::test_cursor_at_start_of_document PASSED  [ 63%]
+test_editor.py::TestEdgesCases::test_whitespace_only_content PASSED      [ 63%]
+test_editor.py::TestEdgesCases::test_newline_only_file PASSED            [ 64%]
+test_editor.py::TestTabs::test_custom_tab_bar_creation PASSED            [ 64%]
+test_editor.py::TestTabs::test_custom_tab_widget_creation PASSED         [ 65%]
+test_editor.py::TestTabs::test_text_editor_with_initial_tab PASSED       [ 65%]
+test_editor.py::TestTabs::test_create_new_tab PASSED                     [ 66%]
+test_editor.py::TestTabs::test_tab_switching PASSED                      [ 66%]
+test_editor.py::TestTabs::test_tab_shows_unsaved_changes PASSED          [ 67%]
+test_editor.py::TestTabs::test_tab_title_updates_on_file_load PASSED     [ 67%]
+test_editor.py::TestTabs::test_load_same_file_switches_to_existing_tab PASSED [ 68%]
+test_editor.py::TestTabs::test_close_tab_with_unsaved_changes PASSED     [ 68%]
+test_editor.py::TestTabs::test_open_files_tracking PASSED                [ 68%]
+test_editor.py::TestMultiTabFunctionality::test_new_file_creates_new_tab PASSED [ 69%]
+test_editor.py::TestMultiTabFunctionality::test_each_tab_has_independent_editor PASSED [ 69%]
+test_editor.py::TestMultiTabFunctionality::test_tab_switch_updates_current_editor PASSED [ 70%]
+test_editor.py::TestMultiTabFunctionality::test_tab_switch_updates_window_title PASSED [ 70%]
+test_editor.py::TestMultiTabFunctionality::test_close_tab_removes_from_open_files PASSED [ 71%]
+test_editor.py::TestMultiTabFunctionality::test_close_tab_updates_remaining_indices PASSED [ 71%]
+test_editor.py::TestMultiTabFunctionality::test_close_all_tabs_shows_welcome_or_empty PASSED [ 72%]
+test_editor.py::TestMultiTabFunctionality::test_modified_indicator_cleared_on_save PASSED [ 72%]
+test_editor.py::TestMultiTabFunctionality::test_tab_close_button_emits_signal PASSED [ 73%]
+test_editor.py::TestMultiTabFunctionality::test_reuse_untitled_tab_when_loading_file PASSED [ 73%]
+test_editor.py::TestMultiTabFunctionality::test_create_new_tab_when_current_modified PASSED [ 73%]
+test_editor.py::TestMultiTabFunctionality::test_cancel_close_keeps_tab_open PASSED [ 74%]
+test_editor.py::TestMultiTabFunctionality::test_save_on_close_tab PASSED [ 74%]
+test_editor.py::TestMultiTabFunctionality::test_multiple_tabs_cursor_position_independent PASSED [ 75%]
+test_editor.py::TestMultiTabFunctionality::test_editor_has_focus_on_startup PASSED [ 75%]
+test_editor.py::TestMultiTabFunctionality::test_editor_has_focus_after_new_file PASSED [ 76%]
+test_editor.py::TestMultiTabFunctionality::test_editor_has_focus_after_opening_file PASSED [ 76%]
+test_editor.py::TestMultiTabFunctionality::test_current_file_preserved_after_discarding_untitled_tab PASSED [ 77%]
+test_editor.py::TestMultiTabFunctionality::test_current_file_preserved_after_saving_untitled_tab PASSED [ 77%]
+test_editor.py::TestMultiTabFunctionality::test_save_untitled_tab_when_not_current_shows_save_dialog PASSED [ 78%]
+test_editor.py::TestSplitView::test_initial_state_has_one_pane PASSED    [ 78%]
+test_editor.py::TestSplitView::test_add_split_view_creates_second_pane PASSED [ 78%]
+test_editor.py::TestSplitView::test_add_split_view_creates_third_pane PASSED [ 79%]
+test_editor.py::TestSplitView::test_max_three_split_panes PASSED         [ 79%]
+test_editor.py::TestSplitView::test_split_button_disabled_at_max_panes PASSED [ 80%]
+test_editor.py::TestSplitView::test_split_button_enabled_after_closing_pane PASSED [ 80%]
+test_editor.py::TestSplitView::test_close_button_hidden_with_one_pane PASSED [ 81%]
+test_editor.py::TestSplitView::test_close_button_visible_with_multiple_panes PASSED [ 81%]
+test_editor.py::TestSplitView::test_close_button_hidden_after_returning_to_one_pane PASSED [ 82%]
+test_editor.py::TestSplitView::test_close_split_pane_removes_pane PASSED [ 82%]
+test_editor.py::TestSplitView::test_cannot_close_last_pane PASSED        [ 83%]
+test_editor.py::TestSplitView::test_each_pane_has_independent_tabs PASSED [ 83%]
+test_editor.py::TestSplitView::test_new_pane_gets_new_tab PASSED         [ 84%]
+test_editor.py::TestSplitView::test_active_pane_switches_on_add PASSED   [ 84%]
+test_editor.py::TestSplitView::test_closing_all_tabs_removes_pane_when_multiple PASSED [ 84%]
+test_editor.py::TestSplitView::test_closing_all_tabs_shows_welcome_when_one_pane PASSED [ 85%]
+test_editor.py::TestSplitView::test_pane_count_decreases_when_closing_tabs PASSED [ 85%]
+test_editor.py::TestSplitView::test_split_pane_has_file_label PASSED     [ 86%]
+test_editor.py::TestSplitView::test_file_label_updates_on_tab_change PASSED [ 86%]
+test_editor.py::TestSplitView::test_split_view_with_file_operations PASSED [ 87%]
+test_editor.py::TestSplitView::test_closing_pane_with_modified_content_prompts PASSED [ 87%]
+test_editor.py::TestSplitView::test_closing_pane_cancel_keeps_pane PASSED [ 88%]
+test_editor.py::TestSplitView::test_close_button_size_is_small PASSED    [ 88%]
+test_editor.py::TestSplitView::test_header_has_fixed_height PASSED       [ 89%]
+test_editor.py::TestSplitView::test_new_file_opens_in_active_pane PASSED [ 89%]
+test_editor.py::TestSplitView::test_folder_label_no_garbage_characters PASSED [ 89%]
+test_editor.py::TestSplitView::test_modified_indicator_clears_after_undo_to_saved_state PASSED [ 90%]
+test_editor.py::TestSplitView::test_modified_indicator_clears_when_manually_typed_back PASSED [ 90%]
+test_editor.py::TestMultiFileSearchBugFix::test_multifile_search_folder_validation_on_startup PASSED [ 91%]
+test_editor.py::TestViewFocus::test_active_view_gets_focus PASSED        [ 91%]
+test_editor.py::TestOpenFileInMultipleViews::test_opening_already_open_file_opens_in_active_view PASSED [ 92%]
+test_editor.py::TestViewActivation::test_clicking_on_view_updates_current_file PASSED [ 92%]
+test_editor.py::TestMultiViewSaveFile::test_save_file_after_closing_extra_views PASSED [ 93%]
+test_editor.py::TestSplitViewButton::test_split_button_shows_max_views_tooltip_when_disabled PASSED [ 93%]
+test_editor.py::TestCursorBehavior::test_press_down_on_last_line_goes_to_end PASSED [ 94%]
+test_editor.py::TestMultiFileSearchResultsDialog::test_search_result_button_closes_all_dialogs PASSED [ 94%]
+test_editor.py::TestActivePaneTracking::test_cursor_movement_to_different_view_updates_active_pane PASSED [ 94%]
+test_editor.py::TestTabClickBehavior::test_clicking_tab_in_current_view_moves_cursor PASSED [ 95%]
+test_editor.py::TestTabClickBehavior::test_clicking_tab_in_different_view_moves_cursor_and_changes_active_pane PASSED [ 95%]
+test_editor.py::TestMultipleSplitPanesUnsavedChanges::test_multiple_views_unsaved_changes_on_exit FAILED [ 96%]
+test_editor.py::TestMultiplePanesFileTracking::test_single_pane_file_in_active_pane PASSED [ 96%]
+test_editor.py::TestMultiplePanesFileTracking::test_multiple_files_in_same_pane PASSED [ 97%]
+test_editor.py::TestMultiplePanesFileTracking::test_files_in_different_split_panes PASSED [ 97%]
+test_editor.py::TestMultiplePanesFileTracking::test_get_files_in_pane PASSED [ 98%]
+test_editor.py::TestDragFileFromSidebarToView::test_pane_accepts_file_drop PASSED [ 98%]
+test_editor.py::TestDragFileFromSidebarToView::test_file_drop_to_second_pane PASSED [ 99%]
+test_editor.py::TestDragTabBetweenViews::test_pane_tab_widget_accepts_tab_drop PASSED [ 99%]
+test_editor.py::TestDragTabBetweenViews::test_tab_moved_between_panes_on_drop PASSED [100%]
+
+================================== FAILURES ===================================
+_____ TestFindReplaceDialog.test_find_replace_marks_document_as_modified ______
+
+self = <test_editor.TestFindReplaceDialog object at 0x000002A6F7B5F9B0>
+qtbot = <pytestqt.qtbot.QtBot object at 0x000002A683683AA0>
+tmp_path = WindowsPath('C:/Users/umyea/AppData/Local/Temp/pytest-of-umyea/pytest-254/test_find_replace_marks_docume0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002A683683A10>
+
+    def test_find_replace_marks_document_as_modified(self, qtbot, tmp_path, monkeypatch):
+        """
+        Test that using find and replace on an opened file marks the document as modified,
+        so that closing the file triggers the unsaved changes warning.
+        """
+        # Create a test file
+        test_file = tmp_path / "test_doc.txt"
+        test_file.write_text("hello world hello", encoding='utf-8')
+    
+        # Open the file in the editor
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.load_file(str(test_file))
+    
+        # Verify file loaded and not modified
+        assert window.editor.toPlainText() == "hello world hello"
+        assert not window.editor.document().isModified()
+    
+        # Use find and replace
+        dialog = FindReplaceDialog(window.editor, window)
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("goodbye")
+    
+        dialog.find_next()
+        dialog.replace()
+    
+        # Verify document is now modified
+        assert window.editor.document().isModified()
+    
+        # Track if the save warning dialog was triggered
+        warning_shown = []
+        monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: warning_shown.append(True) or QMessageBox.Discard)
+    
+        # Try to close - should trigger unsaved changes warning
+        window.close()
+    
+        # Verify the warning was shown
+>       assert len(warning_shown) == 1, "Unsaved changes warning should be shown when closing after find/replace"
+E       AssertionError: Unsaved changes warning should be shown when closing after find/replace
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+test_editor.py:1034: AssertionError
+______ TestFindReplaceDialog.test_replace_all_marks_document_as_modified ______
+
+self = <test_editor.TestFindReplaceDialog object at 0x000002A6F7B5FDD0>
+qtbot = <pytestqt.qtbot.QtBot object at 0x000002A6FA293DA0>
+tmp_path = WindowsPath('C:/Users/umyea/AppData/Local/Temp/pytest-of-umyea/pytest-254/test_replace_all_marks_documen0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002A6800B44A0>
+
+    def test_replace_all_marks_document_as_modified(self, qtbot, tmp_path, monkeypatch):
+        """
+        Test that using Replace All on an opened file marks the document as modified,
+        so that closing the file triggers the unsaved changes warning.
+        """
+        # Create a test file
+        test_file = tmp_path / "test_doc.txt"
+        test_file.write_text("hello world hello", encoding='utf-8')
+    
+        # Open the file in the editor
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.load_file(str(test_file))
+    
+        # Verify file loaded and not modified
+        assert window.editor.toPlainText() == "hello world hello"
+        assert not window.editor.document().isModified()
+    
+        # Use Replace All
+        dialog = FindReplaceDialog(window.editor, window)
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("goodbye")
+        dialog.replace_all()
+    
+        # Verify document is now modified
+        assert window.editor.document().isModified(), "Document should be marked as modified after Replace All"
+    
+        # Track if the save warning dialog was triggered
+        warning_shown = []
+        monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: warning_shown.append(True) or QMessageBox.Discard)
+    
+        # Try to close - should trigger unsaved changes warning
+        window.close()
+    
+        # Verify the warning was shown
+>       assert len(warning_shown) == 1, "Unsaved changes warning should be shown when closing after Replace All"
+E       AssertionError: Unsaved changes warning should be shown when closing after Replace All
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+test_editor.py:1071: AssertionError
+_ TestMultipleSplitPanesUnsavedChanges.test_multiple_views_unsaved_changes_on_exit _
+
+self = <test_editor.TestMultipleSplitPanesUnsavedChanges object at 0x000002A6F7BBD880>
+qtbot = <pytestqt.qtbot.QtBot object at 0x000002A685AC1670>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002A685AC1610>
+
+    def test_multiple_views_unsaved_changes_on_exit(self, qtbot, monkeypatch):
+        """Test that closing the app with unsaved changes in non-active pane is detected."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+    
+        # Create first pane with unsaved changes
+        editor1 = window.tab_widget.widget(0)
+        editor1.insertPlainText("Changes in pane 1")
+        pane1 = window.active_pane
+        assert editor1.document().isModified()
+    
+        # Split the view to create second pane
+        window.add_split_view()
+        pane2 = window.active_pane
+        editor2 = window.tab_widget.widget(0)
+        # Don't add unsaved changes to pane2, it starts clean
+        assert not editor2.document().isModified()
+    
+        # Now switch back to pane1 (making it active), then switch to pane2
+        # This leaves pane1 non-active but with unsaved changes
+        window.set_active_pane(pane2)
+        assert window.active_pane == pane2
+        assert window.tab_widget == pane2.tab_widget
+    
+        # Mock warning to return Cancel for closeEvent
+        warning_call_count = [0]
+    
+        def mock_warning_close(*args, **kwargs):
+            warning_call_count[0] += 1
+            # Return Cancel to prevent close
+            return QMessageBox.Cancel
+    
+        monkeypatch.setattr("main.QMessageBox.warning", mock_warning_close)
+    
+        # Now try to close the app - it should prompt for unsaved changes in pane1 even though pane2 is active
+        from PySide6.QtGui import QCloseEvent
+        close_event = QCloseEvent()
+    
+        window.closeEvent(close_event)
+    
+        # Should have asked about unsaved changes in pane1 (the non-active pane)
+>       assert warning_call_count[0] >= 1, f"Should prompt about unsaved changes in non-active pane, but got {warning_call_count[0]} warnings"
+E       AssertionError: Should prompt about unsaved changes in non-active pane, but got 0 warnings
+E       assert 0 >= 1
+
+test_editor.py:3683: AssertionError
+=========================== short test summary info ===========================
+FAILED test_editor.py::TestFindReplaceDialog::test_find_replace_marks_document_as_modified
+FAILED test_editor.py::TestFindReplaceDialog::test_replace_all_marks_document_as_modified
+FAILED test_editor.py::TestMultipleSplitPanesUnsavedChanges::test_multiple_views_unsaved_changes_on_exit
+======================= 3 failed, 216 passed in 26.75s ========================

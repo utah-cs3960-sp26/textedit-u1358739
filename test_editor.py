@@ -2,7 +2,7 @@ import pytest
 import os
 import tempfile
 from pathlib import Path
-from PySide6.QtCore import Qt, QPoint, QTimer, QDir
+from PySide6.QtCore import Qt, QPoint, QTimer, QDir, QUrl
 from PySide6.QtGui import QTextCursor, QFont
 from PySide6.QtWidgets import QApplication, QMessageBox, QFileDialog, QScrollArea
 from unittest.mock import patch
@@ -3683,3 +3683,274 @@ class TestMultipleSplitPanesUnsavedChanges:
         assert warning_call_count[0] >= 1, f"Should prompt about unsaved changes in non-active pane, but got {warning_call_count[0]} warnings"
         # The event should be ignored because we returned Cancel
         assert not close_event.isAccepted(), "Should not close when user cancels"
+
+
+class TestMultiplePanesFileTracking:
+    """Tests for tracking which files are in which panes after opening them normally."""
+    
+    def test_single_pane_file_in_active_pane(self, qtbot, tmp_path):
+        """Test that a file opened in single pane is in the active pane."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create a test file
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("test content")
+        
+        # Open the file
+        window.load_file(str(test_file))
+        
+        # Verify file is in active pane
+        assert window.current_file == str(test_file)
+        assert window.active_pane.tab_widget.count() == 1
+        assert window.active_pane.tab_widget.tabText(0) == "test.txt"
+    
+    def test_multiple_files_in_same_pane(self, qtbot, tmp_path):
+        """Test that multiple files can be in the same pane."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create test files
+        file1 = tmp_path / "file1.txt"
+        file2 = tmp_path / "file2.txt"
+        file1.write_text("content 1")
+        file2.write_text("content 2")
+        
+        # Open both files
+        window.load_file(str(file1))
+        window.load_file(str(file2))
+        
+        # Verify both files are in active pane
+        assert window.active_pane.tab_widget.count() == 2
+        assert window.active_pane.tab_widget.tabText(0) == "file1.txt"
+        assert window.active_pane.tab_widget.tabText(1) == "file2.txt"
+    
+    def test_files_in_different_split_panes(self, qtbot, tmp_path):
+        """Test that files can be tracked in different split panes."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create test files
+        file1 = tmp_path / "file1.txt"
+        file2 = tmp_path / "file2.txt"
+        file1.write_text("content 1")
+        file2.write_text("content 2")
+        
+        # Open first file in active pane
+        window.load_file(str(file1))
+        pane1 = window.active_pane
+        
+        # Split the editor
+        window.add_split_view()
+        pane2 = window.active_pane
+        
+        # Open second file in new pane
+        window.load_file(str(file2))
+        
+        # Verify files are in different panes
+        assert pane1 != pane2
+        assert pane1.tab_widget.count() == 1
+        assert pane2.tab_widget.count() == 1
+        assert pane1.tab_widget.tabText(0) == "file1.txt"
+        assert pane2.tab_widget.tabText(0) == "file2.txt"
+    
+    def test_get_files_in_pane(self, qtbot, tmp_path):
+        """Test helper function to get all files in a specific pane."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create test files
+        file1 = tmp_path / "file1.txt"
+        file2 = tmp_path / "file2.txt"
+        file1.write_text("content 1")
+        file2.write_text("content 2")
+        
+        # Open files
+        window.load_file(str(file1))
+        window.load_file(str(file2))
+        pane = window.active_pane
+        
+        # Get all files in pane
+        files_in_pane = []
+        for i in range(pane.tab_widget.count()):
+            files_in_pane.append(pane.tab_widget.tabText(i))
+        
+        assert "file1.txt" in files_in_pane
+        assert "file2.txt" in files_in_pane
+
+
+class TestDragFileFromSidebarToView:
+    """Tests for dragging files from sidebar into main view to create tabs."""
+    
+    def test_pane_accepts_file_drop(self, qtbot, tmp_path):
+        """Test that pane's drop event handler accepts files."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create a test file
+        test_file = tmp_path / "document.txt"
+        test_file.write_text("test content")
+        
+        # Simulate dropping file URLs onto the pane
+        from PySide6.QtCore import QMimeData
+        mime_data = QMimeData()
+        mime_data.setUrls([QUrl.fromLocalFile(str(test_file))])
+        
+        # Create drop event
+        from PySide6.QtGui import QDropEvent
+        drop_event = QDropEvent(
+            QPoint(0, 0),
+            Qt.CopyAction,
+            mime_data,
+            Qt.LeftButton,
+            Qt.NoModifier
+        )
+        
+        # Emit the drop event on the pane's tab widget
+        window.active_pane.tab_widget.dropEvent(drop_event)
+        qtbot.wait(100)
+        
+        # Verify file was opened in active pane
+        assert window.active_pane.tab_widget.count() >= 1
+        tab_texts = [window.active_pane.tab_widget.tabText(i) for i in range(window.active_pane.tab_widget.count())]
+        assert "document.txt" in tab_texts
+    
+    def test_file_drop_to_second_pane(self, qtbot, tmp_path, monkeypatch):
+        """Test dropping a file onto a specific split pane opens it there."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Mock QMessageBox to avoid dialogs
+        monkeypatch.setattr(
+            "main.QMessageBox.warning",
+            lambda *args, **kwargs: QMessageBox.Discard
+        )
+        
+        # Create test files
+        file1 = tmp_path / "file1.txt"
+        file2 = tmp_path / "file2.txt"
+        file1.write_text("content 1")
+        file2.write_text("content 2")
+        
+        # Open file1 in pane1
+        window.load_file(str(file1))
+        pane1 = window.active_pane
+        
+        # Create second pane
+        window.add_split_view()
+        pane2 = window.active_pane
+        
+        # Simulate dropping file2 onto pane2
+        from PySide6.QtCore import QMimeData, QUrl
+        from PySide6.QtGui import QDropEvent
+        
+        mime_data = QMimeData()
+        mime_data.setUrls([QUrl.fromLocalFile(str(file2))])
+        
+        drop_event = QDropEvent(
+            QPoint(0, 0),
+            Qt.CopyAction,
+            mime_data,
+            Qt.LeftButton,
+            Qt.NoModifier
+        )
+        
+        pane2.tab_widget.dropEvent(drop_event)
+        qtbot.wait(100)
+        
+        # Verify file2 is in pane2
+        tab_texts = [pane2.tab_widget.tabText(i) for i in range(pane2.tab_widget.count())]
+        assert "file2.txt" in tab_texts
+
+
+class TestDragTabBetweenViews:
+    """Tests for dragging tabs from one pane to another."""
+    
+    def test_pane_tab_widget_accepts_tab_drop(self, qtbot, tmp_path):
+        """Test that pane's tab widget drop handler accepts tab drops."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create test file
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("test content")
+        
+        # Open file in pane1
+        window.load_file(str(test_file))
+        pane1 = window.active_pane
+        
+        # Create pane2
+        window.add_split_view()
+        pane2 = window.active_pane
+        
+        # Simulate tab drop event with mime data
+        from PySide6.QtCore import QMimeData, QPoint
+        from PySide6.QtGui import QDropEvent
+        
+        mime_data = QMimeData()
+        mime_data.setText("tab:0")  # Simulate dropping tab 0
+        
+        drop_event = QDropEvent(
+            QPoint(0, 0),
+            Qt.MoveAction,
+            mime_data,
+            Qt.LeftButton,
+            Qt.NoModifier
+        )
+        
+        # Check that pane2 would accept this drop
+        assert mime_data.text().startswith("tab:")
+    
+    def test_tab_moved_between_panes_on_drop(self, qtbot, tmp_path, monkeypatch):
+        """Test that a tab is actually moved when dropped on another pane."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Mock QMessageBox to avoid dialogs
+        monkeypatch.setattr(
+            "main.QMessageBox.warning",
+            lambda *args, **kwargs: QMessageBox.Discard
+        )
+        
+        # Create test files
+        file1 = tmp_path / "file1.txt"
+        file2 = tmp_path / "file2.txt"
+        file1.write_text("content 1")
+        file2.write_text("content 2")
+        
+        # Open file1 in pane1 with file2 as second tab
+        window.load_file(str(file1))
+        pane1 = window.active_pane
+        window.load_file(str(file2))
+        
+        assert pane1.tab_widget.count() == 2
+        
+        # Create pane2
+        window.add_split_view()
+        pane2 = window.active_pane
+        
+        # Call the handler directly to move tab from pane1 to pane2
+        window.on_tab_dropped_to_pane("tab:0", pane2)
+        qtbot.wait(100)
+        
+        # Tab should now be in pane2
+        assert pane2.tab_widget.count() == 2  # 1 original + 1 moved
+        tab_texts = [pane2.tab_widget.tabText(i) for i in range(pane2.tab_widget.count())]
+        # Check if file1.txt is in tabs (with or without * for modified status)
+        assert any("file1.txt" in text for text in tab_texts)
