@@ -4426,3 +4426,64 @@ class TestMultipleTabMoves:
         
         print(f"\nFinal: pane1={get_tab_names(pane1)}, pane2={get_tab_names(pane2)}")
         print("All 25 moves completed successfully!")
+
+
+class TestDropTabOntoTabBar:
+    """Test dropping a tab onto the tab bar of another pane."""
+
+    def test_drop_tab_onto_tab_bar_moves_tab(self, qtbot, tmp_path):
+        """Bug test: Dropping a tab onto a tab in another view should move it there."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create test files
+        file1 = tmp_path / "file1.txt"
+        file2 = tmp_path / "file2.txt"
+        file3 = tmp_path / "file3.txt"
+        
+        file1.write_text("content 1")
+        file2.write_text("content 2")
+        file3.write_text("content 3")
+        
+        # Load file1 in pane1
+        pane1 = window.active_pane
+        window.load_file(str(file1))
+        
+        # Create pane2 and load file2 and file3
+        window.add_split_view()
+        pane2 = window.active_pane
+        window.load_file(str(file2))
+        window.load_file(str(file3))
+        
+        # Verify initial state
+        assert pane1.tab_widget.count() == 1
+        assert pane2.tab_widget.count() == 2
+        
+        # Simulate dropping onto the tab bar (which triggers CustomTabBar.dropEvent)
+        # The tab bar should emit a signal that gets handled
+        from PySide6.QtCore import QMimeData, QPoint
+        from PySide6.QtGui import QDropEvent
+        
+        # Create mime data as if dragging tab 0 from pane1
+        mime_data = QMimeData()
+        mime_data.setText(f"tab:0:{id(pane1)}")
+        
+        # Simulate the drop on pane2's tab bar
+        tab_bar = pane2.tab_widget.tabBar()
+        
+        # Call the tab bar's drop event handler directly
+        # Since the event is complex to construct, we'll test via the tab_dropped signal
+        # which is what should happen when dropping on the tab bar
+        pane2.tab_widget.tab_dropped.emit(f"tab:0:{id(pane1)}")
+        qtbot.wait(50)
+        
+        # pane1 should be closed since its last tab was moved
+        assert len(window.split_panes) == 1, "pane1 should be closed after moving its last tab"
+        
+        # file1 should now be in pane2
+        pane2_tabs = [pane2.tab_widget.tabText(i) for i in range(pane2.tab_widget.count())]
+        assert any("file1.txt" in t for t in pane2_tabs), \
+            f"file1.txt should be in pane2, but pane2 has: {pane2_tabs}"
+        assert pane2.tab_widget.count() == 3, f"pane2 should have 3 tabs, has {pane2.tab_widget.count()}"

@@ -83,6 +83,7 @@ class CustomTabBar(QTabBar):
     close_requested = Signal(int)
     tab_clicked = Signal(int)
     tab_dragged = Signal(int)  # Signal when tab is being dragged
+    tab_dropped = Signal(str)  # Signal when a tab is dropped onto this tab bar
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -161,8 +162,13 @@ class CustomTabBar(QTabBar):
             super().dragMoveEvent(event)
     
     def dropEvent(self, event):
-        """Handle tab drop - not used for cross-pane drag, handled by CustomTabWidget."""
-        super().dropEvent(event)
+        """Handle tab drop onto the tab bar."""
+        mime = event.mimeData()
+        if mime.text().startswith("tab:"):
+            self.tab_dropped.emit(mime.text())
+            event.acceptProposedAction()
+        else:
+            super().dropEvent(event)
     
     def mouseReleaseEvent(self, event):
         """Clear drag state on mouse release."""
@@ -186,6 +192,7 @@ class CustomTabWidget(QTabWidget):
         self.setTabBar(self.tab_bar)
         self.tab_bar.close_requested.connect(self.on_tab_close_requested)
         self.tab_bar.tab_clicked.connect(self.tab_clicked.emit)
+        self.tab_bar.tab_dropped.connect(self.tab_dropped.emit)
         
         # Enable drop support
         self.setAcceptDrops(True)
