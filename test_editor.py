@@ -3526,3 +3526,109 @@ class TestMultiFileSearchResultsDialog:
         # Verify both dialogs are closed
         assert not results_dialog.isVisible(), "Results dialog should be closed"
         assert not search_dialog.isVisible(), "Search dialog should be closed"
+
+
+class TestActivePaneTracking:
+    """Tests for active pane tracking when cursor moves between views."""
+    
+    def test_cursor_movement_to_different_view_updates_active_pane(self, qtbot):
+        """When cursor moves to a different view, that view becomes active."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create first pane and add some content
+        initial_pane = window.active_pane
+        initial_editor = window.tab_widget.widget(0)
+        initial_editor.setPlainText("View 1")
+        
+        # Split the view
+        window.add_split_view()
+        
+        # Get the panes
+        assert len(window.split_panes) > 0
+        split_pane = window.split_panes[0]
+        second_editor = split_pane.tab_widget.widget(0)
+        second_editor.setPlainText("View 2")
+        
+        # After splitting, the second pane becomes active
+        # Now let's click on the first editor to make it active
+        initial_editor.setFocus()
+        
+        # The active pane should now be the initial pane again
+        first_pane_active = window.active_pane == initial_pane
+        
+        # Now click on the second editor to make it active
+        second_editor.setFocus()
+        
+        # The active pane should now be the second pane
+        assert window.active_pane == split_pane, "When cursor moves to split pane via setFocus(), that pane should become active"
+
+
+class TestTabClickBehavior:
+    """Tests for tab clicking behavior across multiple views."""
+    
+    def test_clicking_tab_in_current_view_moves_cursor(self, qtbot):
+        """When clicking a tab in the current view, cursor should move to that tab."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create two tabs in the main view
+        editor1 = window.tab_widget.widget(0)
+        editor1.setPlainText("Tab 1 content")
+        
+        editor2, _ = window.create_new_tab()
+        editor2.setPlainText("Tab 2 content")
+        
+        # editor2 should have focus from create_new_tab
+        assert editor2.hasFocus(), "editor2 should have focus after creation"
+        assert window.tab_widget.currentIndex() == 1
+        
+        # Now click on tab 0 (editor1's tab)
+        window.tab_widget.setCurrentIndex(0)
+        
+        # After clicking tab 0, the cursor should move to editor1
+        assert editor1.hasFocus(), "Cursor should move to editor1 after clicking its tab"
+    
+    def test_clicking_tab_in_different_view_moves_cursor_and_changes_active_pane(self, qtbot):
+        """When clicking a tab in a different view, cursor should move and that view becomes active."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Get the first pane
+        pane1 = window.active_pane
+        editor1 = window.tab_widget.widget(0)
+        editor1.setPlainText("Pane 1 Content")
+        
+        # Split the view
+        window.add_split_view()
+        
+        # pane2 is now active
+        pane2 = window.active_pane
+        editor2 = window.tab_widget.widget(0)
+        editor2.setPlainText("Pane 2 Content")
+        
+        # Verify pane2 is active and has focus
+        assert window.active_pane == pane2
+        assert editor2.hasFocus()
+        
+        # First, verify pane1 is not active
+        assert window.active_pane != pane1
+        
+        # Simulate a mouse click on a tab in pane1
+        # Get the tab bar and the position of the first tab
+        tab_bar = pane1.tab_widget.tabBar()
+        tab_rect = tab_bar.tabRect(0)
+        tab_center = tab_rect.center()
+        
+        # Use qtbot to simulate the mouse click
+        qtbot.mouseClick(tab_bar, Qt.LeftButton, pos=tab_center)
+        
+        # After clicking, pane1 should be active and editor1 should have focus
+        assert window.active_pane == pane1, "Pane1 should become active when clicking its tab"
+        assert editor1.hasFocus(), "Cursor should move to editor1 in pane1 after clicking its tab"

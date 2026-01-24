@@ -5,7 +5,7 @@ Should
 // Scroll bar doesn't look that great.
 // When I press down when I am on the last line, the cursor doesn't go to the end of the line.  It just stays there.
 // When the split view button is disabled, then display maximun views reached when hovering over the button.
-Make so if a cursor is on that view, then that view is the active view and when a new file is opened it is opened in that view.
+// Make so if a cursor is on that view, then that view is the active view and when a new file is opened it is opened in that view.
 // Make so when a file is already opened and I try to open it in a different view (open it when a different view is active), then it works and now has the file opened twice.
 
 Could

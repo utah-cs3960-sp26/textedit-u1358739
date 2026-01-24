@@ -80,6 +80,7 @@ class CustomTabBar(QTabBar):
     """Custom tab bar with close buttons."""
     
     close_requested = Signal(int)
+    tab_clicked = Signal(int)
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -89,6 +90,13 @@ class CustomTabBar(QTabBar):
     
     def on_close_requested(self, index):
         self.close_requested.emit(index)
+    
+    def mousePressEvent(self, event):
+        """Emit tab_clicked signal when a tab is clicked."""
+        index = self.tabAt(event.position().toPoint())
+        if index >= 0:
+            self.tab_clicked.emit(index)
+        super().mousePressEvent(event)
 
 
 class CustomTabWidget(QTabWidget):
@@ -96,12 +104,14 @@ class CustomTabWidget(QTabWidget):
     
     close_requested = Signal(int)
     split_requested = Signal()
+    tab_clicked = Signal(int)
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.tab_bar = CustomTabBar(self)
         self.setTabBar(self.tab_bar)
         self.tab_bar.close_requested.connect(self.on_tab_close_requested)
+        self.tab_bar.tab_clicked.connect(self.tab_clicked.emit)
         
         # Add split view button to corner
         self.split_button = QPushButton()
@@ -165,6 +175,7 @@ class SplitEditorPane(QWidget):
     close_pane_requested = Signal(object)
     tab_close_requested = Signal(object, int)
     tab_changed = Signal(object, int)
+    tab_clicked = Signal(object, int)
     split_requested = Signal()
     pane_activated = Signal(object)
     
@@ -220,6 +231,7 @@ class SplitEditorPane(QWidget):
         self.tab_widget = CustomTabWidget()
         self.tab_widget.close_requested.connect(lambda idx: self.tab_close_requested.emit(self, idx))
         self.tab_widget.currentChanged.connect(lambda idx: self.tab_changed.emit(self, idx))
+        self.tab_widget.tab_clicked.connect(lambda idx: self.tab_clicked.emit(self, idx))
         self.tab_widget.split_requested.connect(self.split_requested.emit)
         layout.addWidget(self.tab_widget)
         
@@ -1124,6 +1136,7 @@ class TextEditor(QMainWindow):
         pane.close_pane_requested.connect(self.close_split_pane)
         pane.tab_close_requested.connect(self.close_tab_in_pane)
         pane.tab_changed.connect(self.on_pane_tab_changed)
+        pane.tab_clicked.connect(self.on_pane_tab_clicked)
         pane.split_requested.connect(self.add_split_view)
         pane.pane_activated.connect(self.set_active_pane)
         pane.welcome_screen.open_file_clicked.connect(self.open_file)
@@ -1257,6 +1270,13 @@ class TextEditor(QMainWindow):
         
         self.on_tab_changed(index)
     
+    def on_pane_tab_clicked(self, pane, index):
+        """Handle tab click in a pane - ensures pane is active and focus moves to the tab."""
+        # Set this pane as active
+        self.set_active_pane(pane)
+        # Set the tab as current (which will trigger on_pane_tab_changed)
+        pane.tab_widget.setCurrentIndex(index)
+    
     def set_active_pane(self, pane):
         """Set a pane as the active pane."""
         self.active_pane = pane
@@ -1343,6 +1363,10 @@ class TextEditor(QMainWindow):
                      self.setWindowTitle(f"TextEdit - {tab_title}")
              
              self.update_cursor_position()
+             
+             # Set focus on the editor when tab changes
+             if self.editor:
+                 self.editor.setFocus()
     
     def close_tab(self, index):
         """Close a tab, with unsaved changes warning."""
