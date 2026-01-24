@@ -54,3 +54,41 @@ When a task requires fixing a bug, follow this process:
 5. **Reverify if needed** - If you modify the test during implementation, re-verify that the original code fails that test
 
 This ensures the fix is correct and the test properly validates the behavior.
+
+## Common Issues & Solutions
+
+### Windows PowerShell Commands
+This workspace uses Windows PowerShell, not Linux/Unix bash. Do NOT use Unix commands:
+- ❌ `head`, `tail`, `wc`, `grep`, `ls`, `rm` - these don't work
+- ✅ Use PowerShell equivalents instead:
+  - `Get-Content file.txt -Tail 10` - view last 10 lines
+  - `Get-Content file.txt | Measure-Object -Line | Select-Object -ExpandProperty Lines` - count lines
+  - `dir` or `Get-ChildItem` - list files
+  - `del` - delete files
+  - `Select-String` - search text (like grep)
+
+### Adding Tests Without Indentation Problems
+When adding new test classes to `test_editor.py`:
+
+1. **Use `edit_file` with a unique anchor** - Find the very end of the file (last line of the last test) and replace from there
+2. **Ensure tests are top-level classes** - New test classes should be at indentation level 0 (no leading spaces)
+3. **Include blank lines properly** - Add `\n\n` before the new class definition to separate from previous code
+4. **Example:**
+   ```python
+   # Find the last line of the previous test
+   old_str = """        # Last line of previous test
+           assert something == True"""
+   
+   # Replace with the same line plus new test class at top level
+   new_str = """        # Last line of previous test
+           assert something == True
+
+
+class TestNewFeature:
+    """New test class - no indentation!"""
+    
+    def test_something(self, qtbot):
+        """Test description."""
+        pass"""
+   ```
+5. **Never nest classes** - If indentation looks nested, use `git checkout test_editor.py` to revert and try again
