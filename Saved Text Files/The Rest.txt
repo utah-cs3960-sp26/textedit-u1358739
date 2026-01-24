@@ -14,5 +14,5 @@
 // Make so find and replace highlights all instances of the "find" and emphasizes the one that it is currently on.
 
 When I click on the split view button when it is disabled then it doesn't show the "Maximum Views Reached" popup.
-The Maximum Views Reached popup is Maximum views reached instead of Maximum Views Reached
-When I make a change in the first default untitled document then undo the change or delete it (the file is not completely empty) then it still shows that it was modified and when exited it still warns me about unsaved changes. 
+// The Maximum Views Reached popup is Maximum views reached instead of Maximum Views Reached
+// When I make a change in the first default untitled document then undo the change or delete it (the file is not completely empty) then it still shows that it was modified and when exited it still warns me about unsaved changes. 

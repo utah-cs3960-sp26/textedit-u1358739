@@ -284,7 +284,7 @@ class CustomTabWidget(QTabWidget):
         if enabled:
             self.split_button.setToolTip("Split Editor")
         else:
-            self.split_button.setToolTip("Maximum views reached")
+            self.split_button.setToolTip("Maximum Views Reached")
 
 
 class SplitEditorPane(QWidget):
