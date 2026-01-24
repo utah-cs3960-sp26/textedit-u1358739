@@ -3414,9 +3414,9 @@ class TestSplitViewButton:
         for i in range(window.MAX_SPLIT_PANES - 1):
             window.create_split_pane()
         
-        # After reaching max panes, split button should be disabled with new tooltip
+        # After reaching max panes, split button should be disabled with custom tooltip
         assert not window.tab_widget.split_button.isEnabled()
-        assert window.tab_widget.split_button.toolTip() == "Maximum Views Reached"
+        assert window.tab_widget._custom_tooltip.text() == "Maximum Views Reached"
         
         # Close a pane to re-enable it
         window.close_split_pane(window.split_panes[0])

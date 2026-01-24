@@ -235,6 +235,12 @@ class CustomTabWidget(QTabWidget):
         """)
         self._custom_tooltip.hide()
         
+        # Timer for delayed tooltip on hover
+        self._tooltip_delay_timer = QTimer(self)
+        self._tooltip_delay_timer.setSingleShot(True)
+        self._tooltip_delay_timer.setInterval(500)  # 0.5 seconds
+        self._tooltip_delay_timer.timeout.connect(self._show_custom_tooltip)
+        
         self.setCornerWidget(self.split_button, Qt.TopRightCorner)
         
         self.setStyleSheet("""
@@ -304,7 +310,7 @@ class CustomTabWidget(QTabWidget):
             self.split_button.setToolTip("Split Editor")
             self._custom_tooltip.setText("Split Editor")
         else:
-            self.split_button.setToolTip("Maximum Views Reached")
+            self.split_button.setToolTip("")  # Disable Qt's tooltip, use custom instead
             self._custom_tooltip.setText("Maximum Views Reached")
     
     def _show_custom_tooltip(self):
@@ -318,17 +324,21 @@ class CustomTabWidget(QTabWidget):
         self._custom_tooltip.hide()
     
     def eventFilter(self, obj, event):
-        """Show tooltip when clicking on disabled split button, hide when mouse leaves."""
+        """Show custom tooltip on hover/click for disabled split button."""
         if obj == self.split_button and not self.split_button.isEnabled():
-            if event.type() == event.Type.MouseButtonPress:
-                self._tooltip_active = True
+            if event.type() == event.Type.Enter:
+                self._tooltip_delay_timer.start()
+                return True
+            elif event.type() == event.Type.MouseButtonPress:
+                self._tooltip_delay_timer.stop()
                 self._show_custom_tooltip()
                 return True
             elif event.type() == event.Type.MouseButtonRelease:
                 return True
             elif event.type() == event.Type.Leave:
-                self._tooltip_active = False
+                self._tooltip_delay_timer.stop()
                 self._hide_custom_tooltip()
+                return True
         return super().eventFilter(obj, event)
 
 
