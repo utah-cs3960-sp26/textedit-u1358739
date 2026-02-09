@@ -5,13 +5,15 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QFileDialog, QMessageBox, QStatusBar, QMenuBar,
     QToolBar, QLabel, QLineEdit, QDialog, QPushButton, QSplitter,
     QTreeView, QFileSystemModel, QFrame, QTextEdit, QInputDialog, QMenu,
-    QTabWidget, QTabBar, QStyle, QScrollArea, QToolTip
+    QTabWidget, QTabBar, QStyle, QScrollArea, QToolTip, QFontComboBox,
+    QSpinBox, QColorDialog
 )
 from PySide6.QtGui import (
     QAction, QKeySequence, QFont, QColor, QPainter, QTextFormat,
-    QTextCursor, QFontMetrics, QPalette, QShortcut, QTextCharFormat
+    QTextCursor, QFontMetrics, QPalette, QShortcut, QTextCharFormat,
+    QSyntaxHighlighter, QTextDocument
 )
-from PySide6.QtCore import Qt, QRect, QSize, QDir, Signal, QTimer, QPoint, QMimeData, QUrl
+from PySide6.QtCore import Qt, QRect, QSize, QDir, Signal, QTimer, QPoint, QMimeData, QUrl, QRegularExpression
 from PySide6.QtGui import QDrag
 
 
@@ -437,6 +439,394 @@ class LineNumberArea(QWidget):
         self.editor.line_number_area_paint_event(event)
 
 
+class SyntaxHighlighter(QSyntaxHighlighter):
+    """Multi-language syntax highlighter with static language definitions."""
+    
+    # Language definitions with patterns and colors
+    LANGUAGES = {
+        'python': {
+            'keywords': [
+                'False', 'None', 'True', 'and', 'as', 'assert', 'async', 'await',
+                'break', 'class', 'continue', 'def', 'del', 'elif', 'else', 'except',
+                'finally', 'for', 'from', 'global', 'if', 'import', 'in', 'is',
+                'lambda', 'nonlocal', 'not', 'or', 'pass', 'raise', 'return', 'try',
+                'while', 'with', 'yield'
+            ],
+            'builtins': [
+                'abs', 'all', 'any', 'bin', 'bool', 'bytes', 'callable', 'chr',
+                'classmethod', 'compile', 'complex', 'dict', 'dir', 'divmod',
+                'enumerate', 'eval', 'exec', 'filter', 'float', 'format', 'frozenset',
+                'getattr', 'globals', 'hasattr', 'hash', 'help', 'hex', 'id', 'input',
+                'int', 'isinstance', 'issubclass', 'iter', 'len', 'list', 'locals',
+                'map', 'max', 'memoryview', 'min', 'next', 'object', 'oct', 'open',
+                'ord', 'pow', 'print', 'property', 'range', 'repr', 'reversed',
+                'round', 'set', 'setattr', 'slice', 'sorted', 'staticmethod', 'str',
+                'sum', 'super', 'tuple', 'type', 'vars', 'zip'
+            ],
+            'comment': '#',
+            'string_delimiters': ['"""', "'''", '"', "'"],
+            'multiline_strings': True,
+        },
+        'javascript': {
+            'keywords': [
+                'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger',
+                'default', 'delete', 'do', 'else', 'export', 'extends', 'finally',
+                'for', 'function', 'if', 'import', 'in', 'instanceof', 'let', 'new',
+                'return', 'super', 'switch', 'this', 'throw', 'try', 'typeof', 'var',
+                'void', 'while', 'with', 'yield', 'async', 'await', 'of'
+            ],
+            'builtins': [
+                'Array', 'Boolean', 'Date', 'Error', 'Function', 'JSON', 'Math',
+                'Number', 'Object', 'Promise', 'RegExp', 'String', 'Symbol',
+                'console', 'document', 'window', 'null', 'undefined', 'true', 'false',
+                'NaN', 'Infinity', 'parseInt', 'parseFloat', 'isNaN', 'isFinite'
+            ],
+            'comment': '//',
+            'multiline_comment': ('/*', '*/'),
+            'string_delimiters': ['"', "'", '`'],
+        },
+        'html': {
+            'tags': True,
+            'attributes': True,
+        },
+        'css': {
+            'keywords': [
+                'important', 'inherit', 'initial', 'unset', 'none', 'auto'
+            ],
+            'properties': True,
+            'comment': None,
+            'multiline_comment': ('/*', '*/'),
+        },
+        'json': {
+            'keywords': ['true', 'false', 'null'],
+            'string_delimiters': ['"'],
+        },
+        'java': {
+            'keywords': [
+                'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch',
+                'char', 'class', 'const', 'continue', 'default', 'do', 'double',
+                'else', 'enum', 'extends', 'final', 'finally', 'float', 'for',
+                'goto', 'if', 'implements', 'import', 'instanceof', 'int', 'interface',
+                'long', 'native', 'new', 'package', 'private', 'protected', 'public',
+                'return', 'short', 'static', 'strictfp', 'super', 'switch',
+                'synchronized', 'this', 'throw', 'throws', 'transient', 'try',
+                'void', 'volatile', 'while', 'true', 'false', 'null'
+            ],
+            'builtins': [
+                'String', 'Integer', 'Boolean', 'Double', 'Float', 'Long', 'Short',
+                'Byte', 'Character', 'Object', 'Class', 'System', 'Math', 'Exception',
+                'Thread', 'Runnable', 'List', 'Map', 'Set', 'ArrayList', 'HashMap'
+            ],
+            'comment': '//',
+            'multiline_comment': ('/*', '*/'),
+            'string_delimiters': ['"', "'"],
+        },
+        'c': {
+            'keywords': [
+                'auto', 'break', 'case', 'char', 'const', 'continue', 'default',
+                'do', 'double', 'else', 'enum', 'extern', 'float', 'for', 'goto',
+                'if', 'inline', 'int', 'long', 'register', 'restrict', 'return',
+                'short', 'signed', 'sizeof', 'static', 'struct', 'switch', 'typedef',
+                'union', 'unsigned', 'void', 'volatile', 'while', '_Bool', '_Complex',
+                '_Imaginary'
+            ],
+            'builtins': [
+                'NULL', 'EOF', 'stdin', 'stdout', 'stderr', 'printf', 'scanf',
+                'malloc', 'free', 'calloc', 'realloc', 'sizeof'
+            ],
+            'comment': '//',
+            'multiline_comment': ('/*', '*/'),
+            'string_delimiters': ['"', "'"],
+        },
+        'cpp': {
+            'keywords': [
+                'alignas', 'alignof', 'and', 'and_eq', 'asm', 'auto', 'bitand',
+                'bitor', 'bool', 'break', 'case', 'catch', 'char', 'char16_t',
+                'char32_t', 'class', 'compl', 'const', 'constexpr', 'const_cast',
+                'continue', 'decltype', 'default', 'delete', 'do', 'double',
+                'dynamic_cast', 'else', 'enum', 'explicit', 'export', 'extern',
+                'false', 'float', 'for', 'friend', 'goto', 'if', 'inline', 'int',
+                'long', 'mutable', 'namespace', 'new', 'noexcept', 'not', 'not_eq',
+                'nullptr', 'operator', 'or', 'or_eq', 'private', 'protected',
+                'public', 'register', 'reinterpret_cast', 'return', 'short',
+                'signed', 'sizeof', 'static', 'static_assert', 'static_cast',
+                'struct', 'switch', 'template', 'this', 'thread_local', 'throw',
+                'true', 'try', 'typedef', 'typeid', 'typename', 'union', 'unsigned',
+                'using', 'virtual', 'void', 'volatile', 'wchar_t', 'while', 'xor',
+                'xor_eq', 'override', 'final'
+            ],
+            'builtins': [
+                'std', 'string', 'vector', 'map', 'set', 'list', 'cout', 'cin',
+                'endl', 'nullptr', 'size_t'
+            ],
+            'comment': '//',
+            'multiline_comment': ('/*', '*/'),
+            'string_delimiters': ['"', "'"],
+        },
+        'rust': {
+            'keywords': [
+                'as', 'async', 'await', 'break', 'const', 'continue', 'crate',
+                'dyn', 'else', 'enum', 'extern', 'false', 'fn', 'for', 'if',
+                'impl', 'in', 'let', 'loop', 'match', 'mod', 'move', 'mut',
+                'pub', 'ref', 'return', 'self', 'Self', 'static', 'struct',
+                'super', 'trait', 'true', 'type', 'unsafe', 'use', 'where', 'while'
+            ],
+            'builtins': [
+                'bool', 'char', 'str', 'u8', 'u16', 'u32', 'u64', 'u128', 'usize',
+                'i8', 'i16', 'i32', 'i64', 'i128', 'isize', 'f32', 'f64',
+                'String', 'Vec', 'Option', 'Result', 'Box', 'Rc', 'Arc',
+                'Some', 'None', 'Ok', 'Err', 'println', 'print', 'format'
+            ],
+            'comment': '//',
+            'multiline_comment': ('/*', '*/'),
+            'string_delimiters': ['"'],
+        },
+        'go': {
+            'keywords': [
+                'break', 'case', 'chan', 'const', 'continue', 'default', 'defer',
+                'else', 'fallthrough', 'for', 'func', 'go', 'goto', 'if', 'import',
+                'interface', 'map', 'package', 'range', 'return', 'select', 'struct',
+                'switch', 'type', 'var', 'true', 'false', 'nil', 'iota'
+            ],
+            'builtins': [
+                'bool', 'byte', 'complex64', 'complex128', 'error', 'float32',
+                'float64', 'int', 'int8', 'int16', 'int32', 'int64', 'rune',
+                'string', 'uint', 'uint8', 'uint16', 'uint32', 'uint64', 'uintptr',
+                'append', 'cap', 'close', 'complex', 'copy', 'delete', 'imag',
+                'len', 'make', 'new', 'panic', 'print', 'println', 'real', 'recover'
+            ],
+            'comment': '//',
+            'multiline_comment': ('/*', '*/'),
+            'string_delimiters': ['"', "'", '`'],
+        },
+    }
+    
+    # File extension to language mapping
+    EXTENSION_MAP = {
+        '.py': 'python',
+        '.pyw': 'python',
+        '.js': 'javascript',
+        '.jsx': 'javascript',
+        '.ts': 'javascript',
+        '.tsx': 'javascript',
+        '.mjs': 'javascript',
+        '.html': 'html',
+        '.htm': 'html',
+        '.xml': 'html',
+        '.css': 'css',
+        '.scss': 'css',
+        '.sass': 'css',
+        '.less': 'css',
+        '.json': 'json',
+        '.java': 'java',
+        '.c': 'c',
+        '.h': 'c',
+        '.cpp': 'cpp',
+        '.cc': 'cpp',
+        '.cxx': 'cpp',
+        '.hpp': 'cpp',
+        '.hxx': 'cpp',
+        '.rs': 'rust',
+        '.go': 'go',
+    }
+    
+    # VS Code dark theme colors
+    COLORS = {
+        'keyword': '#569cd6',      # Blue
+        'builtin': '#4ec9b0',      # Teal
+        'string': '#ce9178',       # Orange
+        'comment': '#6a9955',      # Green
+        'number': '#b5cea8',       # Light green
+        'operator': '#d4d4d4',     # White
+        'function': '#dcdcaa',     # Yellow
+        'class': '#4ec9b0',        # Teal
+        'decorator': '#d7ba7d',    # Gold
+        'tag': '#569cd6',          # Blue (HTML tags)
+        'attribute': '#9cdcfe',    # Light blue (HTML attributes)
+        'property': '#9cdcfe',     # Light blue (CSS properties)
+        'value': '#ce9178',        # Orange (CSS values)
+    }
+    
+    def __init__(self, document, language=None):
+        super().__init__(document)
+        self.language = language
+        self._setup_formats()
+        self._setup_rules()
+    
+    def _setup_formats(self):
+        """Create text formats for different syntax elements."""
+        self.formats = {}
+        for name, color in self.COLORS.items():
+            fmt = QTextCharFormat()
+            fmt.setForeground(QColor(color))
+            if name == 'keyword':
+                fmt.setFontWeight(QFont.Bold)
+            self.formats[name] = fmt
+    
+    def _setup_rules(self):
+        """Setup highlighting rules based on current language."""
+        self.rules = []
+        self.multiline_state = None
+        self.multiline_comment = None
+        
+        if not self.language or self.language not in self.LANGUAGES:
+            return
+        
+        lang_def = self.LANGUAGES[self.language]
+        
+        # Keywords
+        if 'keywords' in lang_def:
+            keywords = lang_def['keywords']
+            pattern = r'\b(' + '|'.join(keywords) + r')\b'
+            self.rules.append((QRegularExpression(pattern), 'keyword'))
+        
+        # Builtins
+        if 'builtins' in lang_def:
+            builtins = lang_def['builtins']
+            pattern = r'\b(' + '|'.join(builtins) + r')\b'
+            self.rules.append((QRegularExpression(pattern), 'builtin'))
+        
+        # Numbers
+        self.rules.append((QRegularExpression(r'\b\d+\.?\d*([eE][+-]?\d+)?\b'), 'number'))
+        self.rules.append((QRegularExpression(r'\b0[xX][0-9a-fA-F]+\b'), 'number'))
+        
+        # Function definitions and calls
+        if self.language in ['python']:
+            self.rules.append((QRegularExpression(r'\bdef\s+(\w+)'), 'function'))
+            self.rules.append((QRegularExpression(r'\bclass\s+(\w+)'), 'class'))
+            self.rules.append((QRegularExpression(r'@\w+'), 'decorator'))
+        elif self.language in ['javascript', 'java', 'c', 'cpp', 'rust', 'go']:
+            self.rules.append((QRegularExpression(r'\b\w+(?=\s*\()'), 'function'))
+        
+        # Strings (single line)
+        if 'string_delimiters' in lang_def:
+            for delim in lang_def.get('string_delimiters', []):
+                if len(delim) == 1:
+                    escaped_delim = '\\' + delim if delim in '"\'`' else delim
+                    pattern = f'{escaped_delim}[^{escaped_delim}\\\\]*(\\\\.[^{escaped_delim}\\\\]*)*{escaped_delim}'
+                    self.rules.append((QRegularExpression(pattern), 'string'))
+        
+        # Single-line comments
+        if lang_def.get('comment'):
+            comment = lang_def['comment']
+            if comment == '#':
+                self.rules.append((QRegularExpression(r'#[^\n]*'), 'comment'))
+            elif comment == '//':
+                self.rules.append((QRegularExpression(r'//[^\n]*'), 'comment'))
+        
+        # HTML-specific rules
+        if self.language == 'html':
+            # Tags
+            self.rules.append((QRegularExpression(r'</?[\w-]+'), 'tag'))
+            self.rules.append((QRegularExpression(r'/?>'), 'tag'))
+            # Attributes
+            self.rules.append((QRegularExpression(r'\b[\w-]+(?=\s*=)'), 'attribute'))
+            # Attribute values
+            self.rules.append((QRegularExpression(r'"[^"]*"'), 'string'))
+            self.rules.append((QRegularExpression(r"'[^']*'"), 'string'))
+            # Comments
+            self.rules.append((QRegularExpression(r'<!--[^>]*-->'), 'comment'))
+        
+        # CSS-specific rules
+        if self.language == 'css':
+            # Properties
+            self.rules.append((QRegularExpression(r'[\w-]+(?=\s*:)'), 'property'))
+            # Values (after colon)
+            self.rules.append((QRegularExpression(r':\s*[^;{}]+'), 'value'))
+            # Selectors
+            self.rules.append((QRegularExpression(r'[.#]?[\w-]+(?=\s*[{,])'), 'class'))
+        
+        # Store multiline comment delimiters
+        if 'multiline_comment' in lang_def:
+            self.multiline_comment = lang_def['multiline_comment']
+        else:
+            self.multiline_comment = None
+    
+    def set_language(self, language):
+        """Change the highlighting language."""
+        self.language = language
+        self._setup_rules()
+        self.rehighlight()
+    
+    def set_language_from_file(self, file_path):
+        """Detect and set language from file extension."""
+        if file_path:
+            ext = os.path.splitext(file_path)[1].lower()
+            language = self.EXTENSION_MAP.get(ext)
+            self.set_language(language)
+    
+    def highlightBlock(self, text):
+        """Apply syntax highlighting to a block of text."""
+        # Apply single-line rules
+        for pattern, format_name in self.rules:
+            if format_name not in self.formats:
+                continue
+            fmt = self.formats[format_name]
+            match_iterator = pattern.globalMatch(text)
+            while match_iterator.hasNext():
+                match = match_iterator.next()
+                # For patterns with capture groups, highlight the captured group
+                if match.lastCapturedIndex() > 0:
+                    start = match.capturedStart(1)
+                    length = match.capturedLength(1)
+                else:
+                    start = match.capturedStart()
+                    length = match.capturedLength()
+                self.setFormat(start, length, fmt)
+        
+        # Handle multiline comments
+        if self.multiline_comment:
+            self._highlight_multiline_comment(text)
+        
+        # Handle Python multiline strings
+        if self.language == 'python':
+            self._highlight_python_multiline_strings(text)
+    
+    def _highlight_multiline_comment(self, text):
+        """Handle multiline comment highlighting."""
+        start_delim, end_delim = self.multiline_comment
+        
+        self.setCurrentBlockState(0)
+        
+        start_index = 0
+        if self.previousBlockState() != 1:
+            start_index = text.find(start_delim)
+        
+        while start_index >= 0:
+            end_index = text.find(end_delim, start_index + len(start_delim))
+            
+            if end_index == -1:
+                self.setCurrentBlockState(1)
+                comment_length = len(text) - start_index
+            else:
+                comment_length = end_index - start_index + len(end_delim)
+            
+            self.setFormat(start_index, comment_length, self.formats['comment'])
+            start_index = text.find(start_delim, start_index + comment_length)
+    
+    def _highlight_python_multiline_strings(self, text):
+        """Handle Python triple-quoted string highlighting."""
+        for delimiter in ['"""', "'''"]:
+            self._highlight_multiline_string(text, delimiter)
+    
+    def _highlight_multiline_string(self, text, delimiter):
+        """Highlight a multiline string with given delimiter."""
+        # This is a simplified version - full implementation would need state tracking
+        start = 0
+        while True:
+            start_index = text.find(delimiter, start)
+            if start_index == -1:
+                break
+            end_index = text.find(delimiter, start_index + len(delimiter))
+            if end_index == -1:
+                self.setFormat(start_index, len(text) - start_index, self.formats['string'])
+                break
+            else:
+                length = end_index - start_index + len(delimiter)
+                self.setFormat(start_index, length, self.formats['string'])
+                start = end_index + len(delimiter)
+
+
 class CodeEditor(QPlainTextEdit):
     """Text editor with line numbers and syntax highlighting."""
     
@@ -445,6 +835,10 @@ class CodeEditor(QPlainTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.line_number_area = LineNumberArea(self)
+        self._text_color = QColor("#d4d4d4")  # Default text color
+        
+        # Setup syntax highlighter
+        self.highlighter = SyntaxHighlighter(self.document())
         
         self.blockCountChanged.connect(self.update_line_number_area_width)
         self.updateRequest.connect(self.update_line_number_area)
@@ -461,6 +855,30 @@ class CodeEditor(QPlainTextEdit):
         # Set tab width
         metrics = QFontMetrics(font)
         self.setTabStopDistance(4 * metrics.horizontalAdvance(' '))
+    
+    def set_language(self, language):
+        """Set the syntax highlighting language."""
+        self.highlighter.set_language(language)
+    
+    def set_language_from_file(self, file_path):
+        """Set syntax highlighting based on file extension."""
+        self.highlighter.set_language_from_file(file_path)
+    
+    def set_text_color(self, color):
+        """Set the text color for the editor."""
+        self._text_color = color
+        self.setStyleSheet(f"""
+            QPlainTextEdit {{
+                background-color: #1e1e1e;
+                color: {color.name()};
+                border: none;
+                selection-background-color: #264f78;
+            }}
+        """)
+    
+    def get_text_color(self):
+        """Get the current text color."""
+        return self._text_color
     
     def line_number_area_width(self):
         digits = 1
@@ -545,6 +963,111 @@ class CodeEditor(QPlainTextEdit):
             top = bottom
             bottom = top + round(self.blockBoundingRect(block).height())
             block_number += 1
+
+
+class FontSelectionDialog(QDialog):
+    """Dialog for selecting a font with live preview."""
+    
+    def __init__(self, current_font, parent=None):
+        super().__init__(parent)
+        self.selected_font = current_font.family()
+        self.setWindowTitle("Select Font")
+        self.setFixedSize(400, 350)
+        self.setup_ui(current_font)
+        self.apply_dark_theme()
+    
+    def setup_ui(self, current_font):
+        layout = QVBoxLayout(self)
+        
+        # Font list
+        layout.addWidget(QLabel("Select a font:"))
+        
+        self.fonts = ["Consolas", "Courier New", "Lucida Console", "Monaco", "Menlo", 
+                      "DejaVu Sans Mono", "Source Code Pro", "Fira Code", "JetBrains Mono",
+                      "Arial", "Times New Roman", "Verdana", "Georgia", "Trebuchet MS"]
+        
+        from PySide6.QtWidgets import QListWidget
+        self.font_list = QListWidget()
+        self.font_list.setMinimumHeight(150)
+        
+        current_index = 0
+        for i, font_name in enumerate(self.fonts):
+            self.font_list.addItem(font_name)
+            item = self.font_list.item(i)
+            item.setFont(QFont(font_name, 11))
+            if font_name.lower() == current_font.family().lower():
+                current_index = i
+        
+        self.font_list.setCurrentRow(current_index)
+        self.font_list.currentRowChanged.connect(self.update_preview)
+        layout.addWidget(self.font_list)
+        
+        # Preview
+        layout.addWidget(QLabel("Preview:"))
+        self.preview_label = QLabel("The quick brown fox jumps over the lazy dog.\n0123456789 !@#$%^&*()")
+        self.preview_label.setMinimumHeight(60)
+        self.preview_label.setStyleSheet("""
+            QLabel {
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+                padding: 10px;
+                border: 1px solid #454545;
+            }
+        """)
+        self.preview_label.setFont(QFont(current_font.family(), 12))
+        layout.addWidget(self.preview_label)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        ok_btn = QPushButton("OK")
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        button_layout.addStretch()
+        button_layout.addWidget(ok_btn)
+        button_layout.addWidget(cancel_btn)
+        layout.addLayout(button_layout)
+    
+    def update_preview(self, row):
+        if row >= 0 and row < len(self.fonts):
+            font_name = self.fonts[row]
+            self.selected_font = font_name
+            self.preview_label.setFont(QFont(font_name, 12))
+    
+    def get_selected_font(self):
+        return self.selected_font
+    
+    def apply_dark_theme(self):
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #252526;
+                color: #cccccc;
+            }
+            QLabel {
+                color: #cccccc;
+            }
+            QListWidget {
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+                border: 1px solid #454545;
+            }
+            QListWidget::item:selected {
+                background-color: #094771;
+            }
+            QListWidget::item:hover {
+                background-color: #2a2d2e;
+            }
+            QPushButton {
+                background-color: #0e639c;
+                color: white;
+                border: none;
+                padding: 5px 15px;
+                min-width: 70px;
+            }
+            QPushButton:hover {
+                background-color: #1177bb;
+            }
+        """)
 
 
 class FindReplaceDialog(QDialog):
@@ -1439,6 +1962,27 @@ class TextEditor(QMainWindow):
         zoom_out_action.setShortcut("Ctrl+-")
         zoom_out_action.triggered.connect(self.zoom_out)
         view_menu.addAction(zoom_out_action)
+        
+        view_menu.addSeparator()
+        
+        # Language submenu
+        self.language_menu = view_menu.addMenu("&Language")
+        self._setup_language_menu()
+        
+        # Format menu
+        format_menu = menubar.addMenu("F&ormat")
+        
+        font_action = QAction("&Font...", self)
+        font_action.triggered.connect(self.show_font_dialog)
+        format_menu.addAction(font_action)
+        
+        font_size_action = QAction("Font &Size...", self)
+        font_size_action.triggered.connect(self.show_font_size_dialog)
+        format_menu.addAction(font_size_action)
+        
+        font_color_action = QAction("Font &Color...", self)
+        font_color_action.triggered.connect(self.show_font_color_dialog)
+        format_menu.addAction(font_color_action)
         
         # Help menu
         help_menu = menubar.addMenu("&Help")
@@ -2415,6 +2959,11 @@ class TextEditor(QMainWindow):
             self.current_file = file_path
             self.setWindowTitle(f"TextEdit - {file_path}")
             self.update_file_type(file_path)
+            
+            # Apply syntax highlighting based on file extension
+            editor.set_language_from_file(file_path)
+            self._update_language_menu_state(editor.highlighter.language)
+            
             # Focus on editor so user can start typing immediately
             editor.setFocus()
         except Exception as e:
@@ -2461,6 +3010,11 @@ class TextEditor(QMainWindow):
                 self.active_pane.update_file_label(tab_name)
             
             self.update_file_type(file_path)
+            
+            # Apply syntax highlighting based on file extension
+            self.editor.set_language_from_file(file_path)
+            self._update_language_menu_state(self.editor.highlighter.language)
+            
             return True
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not save file:\n{e}")
@@ -2607,6 +3161,70 @@ class TextEditor(QMainWindow):
     def toggle_sidebar(self):
         self.file_tree.setVisible(not self.file_tree.isVisible())
     
+    def _setup_language_menu(self):
+        """Setup the language selection submenu."""
+        languages = [
+            ('Plain Text', None),
+            None,  # Separator
+            ('Python', 'python'),
+            ('JavaScript', 'javascript'),
+            ('HTML', 'html'),
+            ('CSS', 'css'),
+            ('JSON', 'json'),
+            None,  # Separator
+            ('Java', 'java'),
+            ('C', 'c'),
+            ('C++', 'cpp'),
+            ('Rust', 'rust'),
+            ('Go', 'go'),
+        ]
+        
+        self.language_actions = {}
+        for item in languages:
+            if item is None:
+                self.language_menu.addSeparator()
+            else:
+                name, lang_id = item
+                action = QAction(name, self)
+                action.setCheckable(True)
+                action.triggered.connect(lambda checked, lid=lang_id: self.set_editor_language(lid))
+                self.language_menu.addAction(action)
+                self.language_actions[lang_id] = action
+        
+        # Set Plain Text as default checked
+        if None in self.language_actions:
+            self.language_actions[None].setChecked(True)
+    
+    def set_editor_language(self, language):
+        """Set the syntax highlighting language for the current editor."""
+        if self.editor:
+            self.editor.set_language(language)
+            self._update_language_menu_state(language)
+    
+    def _update_language_menu_state(self, language):
+        """Update the language menu checkmarks and status bar."""
+        # Update checked state in menu
+        for lang_id, action in self.language_actions.items():
+            action.setChecked(lang_id == language)
+        
+        # Update status bar file type label
+        if language:
+            lang_names = {
+                'python': 'Python',
+                'javascript': 'JavaScript', 
+                'html': 'HTML',
+                'css': 'CSS',
+                'json': 'JSON',
+                'java': 'Java',
+                'c': 'C',
+                'cpp': 'C++',
+                'rust': 'Rust',
+                'go': 'Go',
+            }
+            self.file_type_label.setText(lang_names.get(language, 'Plain Text'))
+        else:
+            self.file_type_label.setText('Plain Text')
+    
     def zoom_in(self):
         font = self.editor.font()
         font.setPointSize(font.pointSize() + 1)
@@ -2658,6 +3276,68 @@ class TextEditor(QMainWindow):
         # Default font size is 11pt
         zoom_percent = int((font.pointSize() / 11) * 100)
         self.zoom_indicator.setText(f"{zoom_percent}%")
+    
+    def show_font_dialog(self):
+        """Show font selection dialog with preview."""
+        current_font = self.editor.font()
+        dialog = FontSelectionDialog(current_font, self)
+        if dialog.exec() == QDialog.Accepted:
+            font_name = dialog.get_selected_font()
+            self.set_editor_font_family(font_name)
+    
+    def set_editor_font_family(self, font_family):
+        """Set font family for all editors in all panes."""
+        for pane in self.split_panes:
+            for i in range(pane.tab_widget.count()):
+                editor = pane.tab_widget.widget(i)
+                if isinstance(editor, CodeEditor):
+                    current_font = editor.font()
+                    current_font.setFamily(font_family)
+                    editor.setFont(current_font)
+                    editor.line_number_area.setFont(current_font)
+                    metrics = QFontMetrics(current_font)
+                    editor.setTabStopDistance(4 * metrics.horizontalAdvance(' '))
+    
+    def show_font_size_dialog(self):
+        """Show font size selection dialog."""
+        current_font = self.editor.font()
+        current_size = current_font.pointSize()
+        
+        size, ok = QInputDialog.getInt(
+            self, "Select Font Size", "Size (pt):", current_size, 6, 72, 1
+        )
+        if ok:
+            self.set_editor_font_size(size)
+    
+    def set_editor_font_size(self, size):
+        """Set font size for all editors in all panes."""
+        for pane in self.split_panes:
+            for i in range(pane.tab_widget.count()):
+                editor = pane.tab_widget.widget(i)
+                if isinstance(editor, CodeEditor):
+                    current_font = editor.font()
+                    current_font.setPointSize(size)
+                    editor.setFont(current_font)
+                    editor.line_number_area.setFont(current_font)
+                    metrics = QFontMetrics(current_font)
+                    editor.setTabStopDistance(4 * metrics.horizontalAdvance(' '))
+        self.update_zoom_indicator()
+        self.show_zoom_indicator()
+    
+    def show_font_color_dialog(self):
+        """Show font color selection dialog."""
+        current_color = self.editor.get_text_color()
+        color = QColorDialog.getColor(current_color, self, "Select Font Color")
+        if color.isValid():
+            self.set_editor_font_color(color)
+    
+    def set_editor_font_color(self, color):
+        """Set font color for all editors in all panes."""
+        for pane in self.split_panes:
+            for i in range(pane.tab_widget.count()):
+                editor = pane.tab_widget.widget(i)
+                if isinstance(editor, CodeEditor):
+                    editor.set_text_color(color)
     
     def show_about(self):
         QMessageBox.about(

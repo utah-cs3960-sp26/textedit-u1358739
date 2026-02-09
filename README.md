@@ -1,3 +1,7 @@
+Changes made by Didar Jaff
+I added the ability to choose different fonts, font colors, and font sizes in the editor. I also added Multi-language syntax highlighting using static language definitions. You can choose a language of choice and it will automatically highlight it.
+
+
 R1
 I was not in the class for week 1 so I didn't work on the texteditor.
 

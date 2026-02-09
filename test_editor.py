@@ -7,7 +7,7 @@ from PySide6.QtGui import QTextCursor, QFont
 from PySide6.QtWidgets import QApplication, QMessageBox, QFileDialog, QScrollArea
 from unittest.mock import patch
 
-from main import TextEditor, CodeEditor, FindReplaceDialog, LineNumberArea, CustomTabWidget, CustomTabBar
+from main import TextEditor, CodeEditor, FindReplaceDialog, LineNumberArea, CustomTabWidget, CustomTabBar, SyntaxHighlighter
 
 
 class TestCodeEditor:
@@ -4703,3 +4703,493 @@ class TestSplitButtonTooltipOnClick:
         
         # Tooltip should be hidden after leave
         assert not custom_tooltip.isVisible(), "Custom tooltip should be hidden after mouse leave"
+
+
+class TestFontFunctionality:
+    """Tests for font selection, size, and color functionality."""
+
+    def test_format_menu_exists(self, qtbot):
+        """Test that Format menu exists with font options."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        menubar = window.menuBar()
+        
+        format_menu = None
+        for action in menubar.actions():
+            if "ormat" in action.text():
+                format_menu = action.menu()
+                break
+        
+        assert format_menu is not None
+        action_texts = [a.text() for a in format_menu.actions()]
+        assert any("Font" in t for t in action_texts)
+        assert any("Size" in t for t in action_texts)
+        assert any("Color" in t for t in action_texts)
+
+    def test_set_editor_font_family(self, qtbot):
+        """Test setting font family for all editors."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.set_editor_font_family("Arial")
+        
+        assert window.editor.font().family() == "Arial"
+
+    def test_set_editor_font_family_multiple_tabs(self, qtbot):
+        """Test setting font family applies to all open tabs."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.create_new_tab()
+        window.create_new_tab()
+        
+        window.set_editor_font_family("Courier New")
+        
+        for i in range(window.tab_widget.count()):
+            editor = window.tab_widget.widget(i)
+            assert editor.font().family() == "Courier New"
+
+    def test_set_editor_font_size(self, qtbot):
+        """Test setting font size for all editors."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.set_editor_font_size(16)
+        
+        assert window.editor.font().pointSize() == 16
+
+    def test_set_editor_font_size_multiple_tabs(self, qtbot):
+        """Test setting font size applies to all open tabs."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.create_new_tab()
+        window.create_new_tab()
+        
+        window.set_editor_font_size(14)
+        
+        for i in range(window.tab_widget.count()):
+            editor = window.tab_widget.widget(i)
+            assert editor.font().pointSize() == 14
+
+    def test_set_editor_font_color(self, qtbot):
+        """Test setting font color for all editors."""
+        from PySide6.QtGui import QColor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        red_color = QColor(255, 0, 0)
+        window.set_editor_font_color(red_color)
+        
+        editor_color = window.editor.get_text_color()
+        assert editor_color.red() == 255
+        assert editor_color.green() == 0
+        assert editor_color.blue() == 0
+
+    def test_set_editor_font_color_multiple_tabs(self, qtbot):
+        """Test setting font color applies to all open tabs."""
+        from PySide6.QtGui import QColor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.create_new_tab()
+        
+        green_color = QColor(0, 255, 0)
+        window.set_editor_font_color(green_color)
+        
+        for i in range(window.tab_widget.count()):
+            editor = window.tab_widget.widget(i)
+            editor_color = editor.get_text_color()
+            assert editor_color.green() == 255
+
+    def test_font_dialog_cancelled(self, qtbot, monkeypatch):
+        """Test that cancelling font dialog does not change font."""
+        from PySide6.QtWidgets import QDialog
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        original_font = window.editor.font().family()
+        
+        monkeypatch.setattr(
+            "main.FontSelectionDialog.exec",
+            lambda self: QDialog.Rejected
+        )
+        
+        window.show_font_dialog()
+        
+        assert window.editor.font().family() == original_font
+
+    def test_font_size_dialog_cancelled(self, qtbot, monkeypatch):
+        """Test that cancelling font size dialog does not change size."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        original_size = window.editor.font().pointSize()
+        
+        monkeypatch.setattr(
+            "main.QInputDialog.getInt",
+            lambda *args, **kwargs: (20, False)
+        )
+        
+        window.show_font_size_dialog()
+        
+        assert window.editor.font().pointSize() == original_size
+
+    def test_font_color_dialog_cancelled(self, qtbot, monkeypatch):
+        """Test that cancelling font color dialog does not change color."""
+        from PySide6.QtGui import QColor
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        original_color = window.editor.get_text_color()
+        
+        monkeypatch.setattr(
+            "main.QColorDialog.getColor",
+            lambda *args, **kwargs: QColor()
+        )
+        
+        window.show_font_color_dialog()
+        
+        current_color = window.editor.get_text_color()
+        assert current_color == original_color
+
+    def test_font_change_updates_tab_stop_distance(self, qtbot):
+        """Test that changing font updates tab stop distance."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        original_tab_distance = window.editor.tabStopDistance()
+        
+        window.set_editor_font_family("Courier New")
+        
+        new_tab_distance = window.editor.tabStopDistance()
+        assert new_tab_distance > 0
+
+    def test_font_size_shows_zoom_indicator(self, qtbot):
+        """Test that changing font size shows zoom indicator."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.set_editor_font_size(14)
+        
+        assert window.zoom_indicator.isVisible()
+
+    def test_font_applies_to_split_panes(self, qtbot):
+        """Test that font changes apply to editors in split panes."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.add_split_view()
+        
+        assert len(window.split_panes) == 2
+        
+        window.set_editor_font_family("Verdana")
+        
+        for pane in window.split_panes:
+            for i in range(pane.tab_widget.count()):
+                editor = pane.tab_widget.widget(i)
+                assert editor.font().family() == "Verdana"
+
+
+class TestSyntaxHighlighting:
+    """Tests for multi-language syntax highlighting."""
+
+    def test_syntax_highlighter_exists(self, qtbot):
+        """Test that CodeEditor has a syntax highlighter."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        assert editor.highlighter is not None
+        assert isinstance(editor.highlighter, SyntaxHighlighter)
+
+    def test_set_language_python(self, qtbot):
+        """Test setting Python language."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language('python')
+        assert editor.highlighter.language == 'python'
+
+    def test_set_language_javascript(self, qtbot):
+        """Test setting JavaScript language."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language('javascript')
+        assert editor.highlighter.language == 'javascript'
+
+    def test_set_language_from_file_python(self, qtbot):
+        """Test language detection from .py file."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language_from_file('test.py')
+        assert editor.highlighter.language == 'python'
+
+    def test_set_language_from_file_javascript(self, qtbot):
+        """Test language detection from .js file."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language_from_file('test.js')
+        assert editor.highlighter.language == 'javascript'
+
+    def test_set_language_from_file_html(self, qtbot):
+        """Test language detection from .html file."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language_from_file('index.html')
+        assert editor.highlighter.language == 'html'
+
+    def test_set_language_from_file_css(self, qtbot):
+        """Test language detection from .css file."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language_from_file('styles.css')
+        assert editor.highlighter.language == 'css'
+
+    def test_set_language_from_file_json(self, qtbot):
+        """Test language detection from .json file."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language_from_file('config.json')
+        assert editor.highlighter.language == 'json'
+
+    def test_set_language_from_file_java(self, qtbot):
+        """Test language detection from .java file."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language_from_file('Main.java')
+        assert editor.highlighter.language == 'java'
+
+    def test_set_language_from_file_c(self, qtbot):
+        """Test language detection from .c file."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language_from_file('main.c')
+        assert editor.highlighter.language == 'c'
+
+    def test_set_language_from_file_cpp(self, qtbot):
+        """Test language detection from .cpp file."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language_from_file('main.cpp')
+        assert editor.highlighter.language == 'cpp'
+
+    def test_set_language_from_file_rust(self, qtbot):
+        """Test language detection from .rs file."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language_from_file('main.rs')
+        assert editor.highlighter.language == 'rust'
+
+    def test_set_language_from_file_go(self, qtbot):
+        """Test language detection from .go file."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language_from_file('main.go')
+        assert editor.highlighter.language == 'go'
+
+    def test_set_language_from_file_unknown(self, qtbot):
+        """Test language detection from unknown file type."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language_from_file('file.xyz')
+        assert editor.highlighter.language is None
+
+    def test_highlighter_has_rules_for_python(self, qtbot):
+        """Test that Python language has highlighting rules."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language('python')
+        assert len(editor.highlighter.rules) > 0
+
+    def test_highlighter_has_rules_for_javascript(self, qtbot):
+        """Test that JavaScript language has highlighting rules."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.set_language('javascript')
+        assert len(editor.highlighter.rules) > 0
+
+    def test_load_file_sets_language(self, qtbot, tmp_path):
+        """Test that loading a file sets the correct language."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create a test Python file
+        test_file = tmp_path / "test_script.py"
+        test_file.write_text("def hello():\n    print('Hello')")
+        
+        window.load_file(str(test_file))
+        
+        assert window.editor.highlighter.language == 'python'
+
+    def test_save_as_sets_language(self, qtbot, tmp_path, monkeypatch):
+        """Test that saving with new extension updates language."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Set up content
+        window.editor.setPlainText("function test() { return 1; }")
+        
+        # Mock save dialog
+        js_file = str(tmp_path / "test.js")
+        monkeypatch.setattr(
+            "main.QFileDialog.getSaveFileName",
+            lambda *args, **kwargs: (js_file, "JavaScript Files (*.js)")
+        )
+        
+        window.save_file_as()
+        
+        assert window.editor.highlighter.language == 'javascript'
+
+    def test_syntax_highlighter_extension_map(self, qtbot):
+        """Test that extension map contains expected mappings."""
+        assert SyntaxHighlighter.EXTENSION_MAP['.py'] == 'python'
+        assert SyntaxHighlighter.EXTENSION_MAP['.js'] == 'javascript'
+        assert SyntaxHighlighter.EXTENSION_MAP['.ts'] == 'javascript'
+        assert SyntaxHighlighter.EXTENSION_MAP['.html'] == 'html'
+        assert SyntaxHighlighter.EXTENSION_MAP['.css'] == 'css'
+        assert SyntaxHighlighter.EXTENSION_MAP['.json'] == 'json'
+        assert SyntaxHighlighter.EXTENSION_MAP['.java'] == 'java'
+        assert SyntaxHighlighter.EXTENSION_MAP['.c'] == 'c'
+        assert SyntaxHighlighter.EXTENSION_MAP['.cpp'] == 'cpp'
+        assert SyntaxHighlighter.EXTENSION_MAP['.rs'] == 'rust'
+        assert SyntaxHighlighter.EXTENSION_MAP['.go'] == 'go'
+
+    def test_syntax_highlighter_colors_defined(self, qtbot):
+        """Test that syntax highlighting colors are defined."""
+        assert 'keyword' in SyntaxHighlighter.COLORS
+        assert 'builtin' in SyntaxHighlighter.COLORS
+        assert 'string' in SyntaxHighlighter.COLORS
+        assert 'comment' in SyntaxHighlighter.COLORS
+        assert 'number' in SyntaxHighlighter.COLORS
+        assert 'function' in SyntaxHighlighter.COLORS
+
+    def test_python_keywords_defined(self, qtbot):
+        """Test that Python keywords are defined."""
+        python_def = SyntaxHighlighter.LANGUAGES['python']
+        assert 'def' in python_def['keywords']
+        assert 'class' in python_def['keywords']
+        assert 'import' in python_def['keywords']
+        assert 'if' in python_def['keywords']
+        assert 'for' in python_def['keywords']
+
+    def test_javascript_keywords_defined(self, qtbot):
+        """Test that JavaScript keywords are defined."""
+        js_def = SyntaxHighlighter.LANGUAGES['javascript']
+        assert 'function' in js_def['keywords']
+        assert 'const' in js_def['keywords']
+        assert 'let' in js_def['keywords']
+        assert 'var' in js_def['keywords']
+        assert 'async' in js_def['keywords']
+
+    def test_language_menu_exists(self, qtbot):
+        """Test that View > Language menu exists."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        # Check that language_menu attribute exists
+        assert hasattr(window, 'language_menu')
+        assert window.language_menu is not None
+
+    def test_language_menu_has_languages(self, qtbot):
+        """Test that language menu has expected language options."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        
+        assert 'python' in window.language_actions
+        assert 'javascript' in window.language_actions
+        assert 'html' in window.language_actions
+        assert 'css' in window.language_actions
+        assert None in window.language_actions  # Plain Text
+
+    def test_set_editor_language_from_menu(self, qtbot):
+        """Test setting language via menu updates editor."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.set_editor_language('python')
+        
+        assert window.editor.highlighter.language == 'python'
+
+    def test_language_menu_updates_checkmark(self, qtbot):
+        """Test that selecting a language updates the checkmark."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.set_editor_language('javascript')
+        
+        assert window.language_actions['javascript'].isChecked()
+        assert not window.language_actions['python'].isChecked()
+        assert not window.language_actions[None].isChecked()
+
+    def test_language_menu_updates_status_bar(self, qtbot):
+        """Test that selecting a language updates status bar."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.set_editor_language('python')
+        
+        assert window.file_type_label.text() == 'Python'
+
+    def test_plain_text_clears_highlighting(self, qtbot):
+        """Test that selecting Plain Text clears highlighting."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        window.set_editor_language('python')
+        assert window.editor.highlighter.language == 'python'
+        
+        window.set_editor_language(None)
+        assert window.editor.highlighter.language is None
+        assert window.file_type_label.text() == 'Plain Text'
+
+    def test_load_file_updates_language_menu(self, qtbot, tmp_path):
+        """Test that loading a file updates language menu checkmark."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        test_file = tmp_path / "script.py"
+        test_file.write_text("print('hello')")
+        
+        window.load_file(str(test_file))
+        
+        assert window.language_actions['python'].isChecked()
