@@ -83,7 +83,6 @@ class CustomTabBar(QTabBar):
     
     close_requested = Signal(int)
     tab_clicked = Signal(int)
-    tab_dragged = Signal(int)  # Signal when tab is being dragged
     tab_dropped = Signal(str)  # Signal when a tab is dropped onto this tab bar
     
     def __init__(self, parent=None):
@@ -1409,117 +1408,6 @@ class MultiFileSearchDialog(QDialog):
                 QMessageBox.warning(self, "Error", f"Could not process {file_path}: {e}")
         
         QMessageBox.information(self, "Replace Complete", f"Replaced {replaced_count} occurrences in {len(files_to_replace)} files.")
-
-
-
-
-class DragDropFileTree(QTreeView):
-    """QTreeView with drag and drop support for moving files/folders."""
-    
-    files_moved = Signal(list)  # Signal with list of (old_path, new_path) tuples
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setDragEnabled(True)
-        self.setAcceptDrops(True)
-        self.setDropIndicatorShown(True)
-        self.setDefaultDropAction(Qt.MoveAction)
-    
-    def dragEnterEvent(self, event):
-        """Accept drag events."""
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
-        else:
-            super().dragEnterEvent(event)
-    
-    def dragMoveEvent(self, event):
-        """Handle drag move events."""
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
-        else:
-            super().dragMoveEvent(event)
-    
-    def dropEvent(self, event):
-        """Handle drop events to move files/folders."""
-        if not event.mimeData().hasUrls():
-            super().dropEvent(event)
-            return
-        
-        # Get the destination index
-        drop_pos = event.position().toPoint()
-        dest_index = self.indexAt(drop_pos)
-        
-        if not dest_index.isValid():
-            return
-        
-        # Get the file model
-        file_model = self.model()
-        if not file_model:
-            return
-        
-        dest_path = file_model.filePath(dest_index)
-        
-        # Check if destination is a folder
-        if not file_model.isDir(dest_index):
-            return
-        
-        # Get source URLs
-        urls = event.mimeData().urls()
-        
-        # Track file moves for later notification
-        moved_files = []
-        
-        # Move each file/folder
-        for url in urls:
-            source_path = url.toLocalFile()
-            
-            if not source_path:
-                continue
-            
-            # Prevent moving to itself
-            if os.path.normpath(source_path) == os.path.normpath(dest_path):
-                continue
-            
-            # Prevent moving a folder into itself
-            if os.path.normpath(dest_path).startswith(os.path.normpath(source_path) + os.sep):
-                continue
-            
-            try:
-                import shutil
-                source_name = os.path.basename(source_path)
-                dest_file_path = os.path.join(dest_path, source_name)
-                
-                # Check if destination already exists
-                if os.path.exists(dest_file_path):
-                    # If it's a directory and source is also a directory, merge
-                    if os.path.isdir(dest_file_path) and os.path.isdir(source_path):
-                        # Move contents into existing directory
-                        for item in os.listdir(source_path):
-                            src = os.path.join(source_path, item)
-                            dst = os.path.join(dest_file_path, item)
-                            if os.path.exists(dst):
-                                if os.path.isdir(dst):
-                                    shutil.rmtree(dst)
-                                else:
-                                    os.remove(dst)
-                            shutil.move(src, dst)
-                        os.rmdir(source_path)
-                        moved_files.append((source_path, dest_file_path))
-                    else:
-                        # Skip if file with same name exists
-                        continue
-                else:
-                    # Move the file or folder
-                    shutil.move(source_path, dest_file_path)
-                    moved_files.append((source_path, dest_file_path))
-            except Exception as e:
-                pass
-        
-        # Notify listeners of the file moves
-        if moved_files:
-            self.files_moved.emit(moved_files)
-        
-        event.acceptProposedAction()
 
 
 
