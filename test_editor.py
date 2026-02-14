@@ -5806,3 +5806,366 @@ class TestSyntaxHighlighting:
         assert isinstance(highlighter.formats, dict)
         assert len(highlighter.formats) > 0
 
+
+class TestMultiFileSearchAndReplace:
+    """Tests for multifile find and replace functionality."""
+
+    def test_find_all_files_basic(self, qtbot, tmp_path):
+        """Test finding text across multiple files."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        # Create test files
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("hello world\nfoo bar\nhello again")
+        
+        file2 = tmp_path / "file2.txt"
+        file2.write_text("hello there\nno match here")
+        
+        # Create dialog
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("hello")
+        
+        results = dialog.find_all_files()
+        
+        # Should find 3 matches total
+        assert len(results) == 3
+        # Check that results contain expected data
+        assert any("file1.txt" in r[0] for r in results)
+        assert any("file2.txt" in r[0] for r in results)
+
+    def test_find_all_files_case_insensitive(self, qtbot, tmp_path):
+        """Test case-insensitive find across files."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("Hello World\nHELLO there\nheLLo again")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("hello")
+        
+        results = dialog.find_all_files()
+        
+        # Should find all case variations
+        assert len(results) == 3
+
+    def test_find_all_files_no_matches(self, qtbot, tmp_path):
+        """Test find when no matches exist."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("foo bar\nbaz qux")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("nonexistent")
+        
+        results = dialog.find_all_files()
+        
+        assert len(results) == 0
+
+    def test_find_all_files_empty_search(self, qtbot, tmp_path, monkeypatch):
+        """Test that empty search shows warning."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("content")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("")
+        
+        warning_called = []
+        monkeypatch.setattr(
+            "main.QMessageBox.warning",
+            lambda *args, **kwargs: warning_called.append(True)
+        )
+        
+        dialog.find_all_files()
+        
+        # Empty search should trigger warning
+        assert len(warning_called) == 1
+
+    def test_find_multiple_matches_in_same_line(self, qtbot, tmp_path):
+        """Test finding multiple matches on same line."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("hello hello hello\nfoo bar")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("hello")
+        
+        results = dialog.find_all_files()
+        
+        # Should find 3 matches (all on same line)
+        assert len(results) == 3
+        # All from same file and line
+        assert all(r[1] == 1 for r in results)
+
+    def test_replace_all_files_basic(self, qtbot, tmp_path, monkeypatch):
+        """Test replacing text in multiple files."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("hello world\nhello there")
+        
+        file2 = tmp_path / "file2.txt"
+        file2.write_text("hello again\nno hello here")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("goodbye")
+        
+        # Mock QMessageBox to prevent blocking
+        monkeypatch.setattr(
+            "main.QMessageBox.information",
+            lambda *args, **kwargs: None
+        )
+        
+        dialog.replace_all_files()
+        
+        # Check file1 was replaced
+        content1 = file1.read_text()
+        assert "goodbye world" in content1
+        assert "goodbye there" in content1
+        assert "hello" not in content1
+        
+        # Check file2 was replaced
+        content2 = file2.read_text()
+        assert "goodbye again" in content2
+        assert "no goodbye here" in content2
+        assert "hello" not in content2
+
+    def test_replace_all_files_case_insensitive(self, qtbot, tmp_path, monkeypatch):
+        """Test case-insensitive replacement."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("Hello HELLO heLLo")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("goodbye")
+        
+        # Mock QMessageBox to prevent blocking
+        monkeypatch.setattr(
+            "main.QMessageBox.information",
+            lambda *args, **kwargs: None
+        )
+        
+        dialog.replace_all_files()
+        
+        content = file1.read_text()
+        # All variations should be replaced
+        assert "goodbye goodbye goodbye" == content
+
+    def test_replace_all_files_no_matches(self, qtbot, tmp_path, monkeypatch):
+        """Test replace when no matches exist."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("foo bar")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("nonexistent")
+        dialog.replace_input.setText("replacement")
+        
+        info_called = []
+        monkeypatch.setattr(
+            "main.QMessageBox.information",
+            lambda *args, **kwargs: info_called.append(True)
+        )
+        
+        dialog.replace_all_files()
+        
+        # Should show info dialog about no matches
+        assert len(info_called) == 1
+
+    def test_replace_all_files_empty_find(self, qtbot, tmp_path, monkeypatch):
+        """Test that empty find text shows warning."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("content")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("")
+        dialog.replace_input.setText("new")
+        
+        warning_called = []
+        monkeypatch.setattr(
+            "main.QMessageBox.warning",
+            lambda *args, **kwargs: warning_called.append(True)
+        )
+        
+        dialog.replace_all_files()
+        
+        assert len(warning_called) == 1
+
+    def test_replace_with_special_regex_characters(self, qtbot, tmp_path, monkeypatch):
+        """Test replacing text with special regex characters."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("price: $100\nprice: $200")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("$")
+        dialog.replace_input.setText("EUR")
+        
+        # Mock QMessageBox to prevent blocking
+        monkeypatch.setattr(
+            "main.QMessageBox.information",
+            lambda *args, **kwargs: None
+        )
+        
+        dialog.replace_all_files()
+        
+        content = file1.read_text()
+        assert "EUR100" in content
+        assert "EUR200" in content
+
+    def test_find_all_in_nested_directories(self, qtbot, tmp_path):
+        """Test finding text in nested directory structure."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        # Create nested structure
+        subdir = tmp_path / "subdir"
+        subdir.mkdir()
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("hello")
+        
+        file2 = subdir / "file2.txt"
+        file2.write_text("hello world")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("hello")
+        
+        results = dialog.find_all_files()
+        
+        # Should find in both root and nested files
+        assert len(results) == 2
+
+    def test_replace_all_in_nested_directories(self, qtbot, tmp_path, monkeypatch):
+        """Test replacing text in nested directory structure."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        subdir = tmp_path / "subdir"
+        subdir.mkdir()
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("hello")
+        
+        file2 = subdir / "file2.txt"
+        file2.write_text("hello world")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("hi")
+        
+        # Mock QMessageBox to prevent blocking
+        monkeypatch.setattr(
+            "main.QMessageBox.information",
+            lambda *args, **kwargs: None
+        )
+        
+        dialog.replace_all_files()
+        
+        assert file1.read_text() == "hi"
+        assert file2.read_text() == "hi world"
+
+    def test_find_with_multiline_context(self, qtbot, tmp_path):
+        """Test that find results include correct line numbers."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("line 1\nline 2\nhello\nline 4\nhello")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("hello")
+        
+        results = dialog.find_all_files()
+        
+        # Should find 2 matches
+        assert len(results) == 2
+        # Check line numbers
+        line_nums = [r[1] for r in results]
+        assert 3 in line_nums
+        assert 5 in line_nums
+
+    def test_replace_empty_with_text(self, qtbot, tmp_path, monkeypatch):
+        """Test replacing empty string (adding prefix)."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("hello\nworld")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        # This would search for empty, which we handle with warning
+        dialog.find_input.setText("hello")
+        dialog.replace_input.setText("")
+        
+        # Mock QMessageBox to prevent blocking
+        monkeypatch.setattr(
+            "main.QMessageBox.information",
+            lambda *args, **kwargs: None
+        )
+        
+        dialog.replace_all_files()
+        
+        content = file1.read_text()
+        # hello should be removed
+        assert "hello" not in content
+
+    def test_find_all_results_dialog_shows(self, qtbot, tmp_path, monkeypatch):
+        """Test that find all shows results dialog."""
+        from main import MultiFileSearchDialog, TextEditor
+        
+        file1 = tmp_path / "file1.txt"
+        file1.write_text("hello")
+        
+        window = TextEditor()
+        qtbot.addWidget(window)
+        dialog = MultiFileSearchDialog(str(tmp_path), window)
+        dialog.find_input.setText("hello")
+        
+        # Track exec calls (dialog.exec())
+        exec_called = []
+        original_exec = dialog.__class__.__bases__[0].exec
+        monkeypatch.setattr(
+            "main.MultiFileSearchResultsDialog.exec",
+            lambda self: exec_called.append(True)
+        )
+        
+        dialog.find_all()
+        
+        # Should have created and shown results dialog
+        assert len(exec_called) == 1
+
