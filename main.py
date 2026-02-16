@@ -2606,61 +2606,6 @@ class TextEditor(QMainWindow):
                     self.tab_widget.setTabText(pane_info, file_name)
     
 
-    def on_files_moved(self, moved_files):
-        """Handle files that were moved via drag and drop in the file tree."""
-        for old_path, new_path in moved_files:
-            self.update_moved_file_paths(old_path, new_path)
-    
-    def update_moved_file_paths(self, old_path, new_path):
-        """Update tracked file paths when a file is moved."""
-        old_path_norm = os.path.normpath(old_path)
-        new_path_norm = os.path.normpath(new_path)
-        
-        # Check if this file or files in this directory are open
-        files_to_update = []
-        for file_path in list(self.open_files.keys()):
-            file_path_norm = os.path.normpath(file_path)
-            
-            # Check if this is the exact file or a file inside the moved directory
-            if file_path_norm == old_path_norm:
-                # Exact match - single file was moved
-                files_to_update.append((file_path, new_path))
-            elif file_path_norm.startswith(old_path_norm + os.sep):
-                # File is inside the moved directory
-                relative_path = file_path_norm[len(old_path_norm) + 1:]
-                updated_path = os.path.join(new_path, relative_path)
-                files_to_update.append((file_path, updated_path))
-        
-        # Update all tracked paths
-        for old_file_path, new_file_path in files_to_update:
-            # Update the open_files dictionary
-            pane_info = self.open_files.pop(old_file_path)
-            self.open_files[new_file_path] = pane_info
-            
-            # Update file_modified_state if present
-            if old_file_path in self.file_modified_state:
-                state = self.file_modified_state.pop(old_file_path)
-                self.file_modified_state[new_file_path] = state
-            
-            # Update current_file if it was the current file
-            if self.current_file == old_file_path:
-                self.current_file = new_file_path
-                # Update window title with new path
-                file_name = os.path.basename(new_file_path)
-                self.setWindowTitle(f"TextEdit - {file_name}")
-            
-            # Update the tab label if the file is open
-            if isinstance(pane_info, tuple):
-                pane, tab_index = pane_info
-                if pane and tab_index < pane.tab_widget.count():
-                    file_name = os.path.basename(new_file_path)
-                    pane.tab_widget.setTabText(tab_index, file_name)
-            else:
-                # Legacy format (just tab index)
-                if pane_info < self.tab_widget.count():
-                    file_name = os.path.basename(new_file_path)
-                    self.tab_widget.setTabText(pane_info, file_name)
-    
     def load_file(self, file_path):
         try:
             # Check if file is already open in the active pane's current tab
