@@ -2231,12 +2231,8 @@ class TextEditor(QMainWindow):
              # Find the file path for this tab
              new_current_file = None
              for file_path, pane_info in self.open_files.items():
-                 if isinstance(pane_info, tuple):
-                     pane, tab_index = pane_info
-                     if pane == self.active_pane and tab_index == index:
-                         new_current_file = file_path
-                         break
-                 elif pane_info == index:
+                 pane, tab_index = pane_info
+                 if pane == self.active_pane and tab_index == index:
                      new_current_file = file_path
                      break
              
@@ -2286,12 +2282,8 @@ class TextEditor(QMainWindow):
         # Find the file path for this tab
         file_path = None
         for path, pane_info in self.open_files.items():
-            if isinstance(pane_info, tuple):
-                pane, tab_idx = pane_info
-                if pane == self.active_pane and tab_idx == index:
-                    file_path = path
-                    break
-            elif pane_info == index:
+            pane, tab_idx = pane_info
+            if pane == self.active_pane and tab_idx == index:
                 file_path = path
                 break
         
@@ -2329,14 +2321,8 @@ class TextEditor(QMainWindow):
         """Remove a tab without prompting."""
         # Find and remove from open_files dict
         for file_path, pane_info in list(self.open_files.items()):
-            if isinstance(pane_info, tuple):
-                pane, tab_idx = pane_info
-                if pane == self.active_pane and tab_idx == index:
-                    del self.open_files[file_path]
-                    if file_path in self.file_modified_state:
-                        del self.file_modified_state[file_path]
-                    break
-            elif pane_info == index:
+            pane, tab_idx = pane_info
+            if pane == self.active_pane and tab_idx == index:
                 del self.open_files[file_path]
                 if file_path in self.file_modified_state:
                     del self.file_modified_state[file_path]
@@ -2345,12 +2331,9 @@ class TextEditor(QMainWindow):
         # Update indices in open_files for tabs after the removed one BEFORE removing
         # This ensures on_tab_changed can find the correct file when it fires
         for file_path, pane_info in list(self.open_files.items()):
-            if isinstance(pane_info, tuple):
-                pane, tab_idx = pane_info
-                if pane == self.active_pane and tab_idx > index:
-                    self.open_files[file_path] = (pane, tab_idx - 1)
-            elif pane_info > index:
-                self.open_files[file_path] = pane_info - 1
+            pane, tab_idx = pane_info
+            if pane == self.active_pane and tab_idx > index:
+                self.open_files[file_path] = (pane, tab_idx - 1)
         
         # Remove the tab (this triggers on_tab_changed)
         self.tab_widget.removeTab(index)
@@ -2501,12 +2484,9 @@ class TextEditor(QMainWindow):
                          target_tab_widget.removeTab(tab_index)
                          # Update indices in open_files for tabs after the removed one
                          for open_file_path, info in list(self.open_files.items()):
-                             if isinstance(info, tuple):
-                                 p, idx = info
-                                 if p == pane and idx > tab_index:
-                                     self.open_files[open_file_path] = (p, idx - 1)
-                             elif info > tab_index:
-                                 self.open_files[open_file_path] = info - 1
+                             p, idx = info
+                             if p == pane and idx > tab_index:
+                                 self.open_files[open_file_path] = (p, idx - 1)
                      # Ensure current_file is cleared if this was the current file
                      if was_current:
                          self.current_file = None
@@ -2516,11 +2496,7 @@ class TextEditor(QMainWindow):
                     for open_file_path in list(self.open_files.keys()):
                         if open_file_path.startswith(file_path):
                             pane_info = self.open_files[open_file_path]
-                            if isinstance(pane_info, tuple):
-                                pane, tab_index = pane_info
-                            else:
-                                pane = self.active_pane
-                                tab_index = pane_info
+                            pane, tab_index = pane_info
                             del self.open_files[open_file_path]
                             if open_file_path in self.file_modified_state:
                                 del self.file_modified_state[open_file_path]
@@ -2536,12 +2512,9 @@ class TextEditor(QMainWindow):
                                 target_tab_widget.removeTab(tab_index)
                                 # Update indices in open_files for tabs after the removed one
                                 for other_file_path, info in list(self.open_files.items()):
-                                    if isinstance(info, tuple):
-                                        p, idx = info
-                                        if p == pane and idx > tab_index:
-                                            self.open_files[other_file_path] = (p, idx - 1)
-                                    elif info > tab_index:
-                                        self.open_files[other_file_path] = info - 1
+                                    p, idx = info
+                                    if p == pane and idx > tab_index:
+                                        self.open_files[other_file_path] = (p, idx - 1)
                 
                 # Refresh file model to stop watching the deleted path
                 root_path = self.file_model.rootPath()
@@ -2600,10 +2573,11 @@ class TextEditor(QMainWindow):
                     file_name = os.path.basename(new_file_path)
                     pane.tab_widget.setTabText(tab_index, file_name)
             else:
-                # Legacy format (just tab index)
-                if pane_info < self.tab_widget.count():
+                # Update the tab label if the file is open in current pane
+                pane, tab_index = pane_info
+                if pane == self.active_pane and tab_index < self.tab_widget.count():
                     file_name = os.path.basename(new_file_path)
-                    self.tab_widget.setTabText(pane_info, file_name)
+                    self.tab_widget.setTabText(tab_index, file_name)
     
 
     def load_file(self, file_path):
@@ -2611,22 +2585,12 @@ class TextEditor(QMainWindow):
             # Check if file is already open in the active pane's current tab
             if file_path in self.open_files:
                 pane_info = self.open_files[file_path]
-                if isinstance(pane_info, tuple):
-                    pane, tab_index = pane_info
-                    # Only switch tab if file is already open in the active pane
-                    if pane == self.active_pane and tab_index != self.tab_widget.currentIndex():
-                        self.tab_widget.setCurrentIndex(tab_index)
-                        return
-                    # If file is in a different pane, we'll open it in the active pane (don't return, continue below)
-                elif pane_info != self.tab_widget.currentIndex():
-                    # Check if this is in the active pane
-                    # If it's in the current tab widget, switch to it
-                    for file_p, info in self.open_files.items():
-                        if isinstance(info, tuple):
-                            p, idx = info
-                            if p == self.active_pane and idx == pane_info and file_p == file_path:
-                                self.tab_widget.setCurrentIndex(pane_info)
-                                return
+                pane, tab_index = pane_info
+                # Only switch tab if file is already open in the active pane
+                if pane == self.active_pane and tab_index != self.tab_widget.currentIndex():
+                    self.tab_widget.setCurrentIndex(tab_index)
+                    return
+                # If file is in a different pane, we'll open it in the active pane (don't return, continue below)
             
             # Load file content
             with open(file_path, 'r', encoding='utf-8') as f:
