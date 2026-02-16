@@ -3046,16 +3046,16 @@ class TextEditor(QMainWindow):
     
 
     def show_about(self):
-        QMessageBox.about(
-            self, "About TextEdit",
-            "TextEdit - A VS Code-like Text Editor\n\n"
-            "Built with Python and PySide6\n\n"
-            "Features:\n"
-            "â€¢ Syntax highlighting line numbers\n"
-            "â€¢ File explorer sidebar\n"
-            "â€¢ Find and replace\n"
-            "â€¢ Dark theme"
-        )
+         QMessageBox.about(
+             self, "About TextEdit",
+             "TextEdit - A VS Code-like Text Editor\n\n"
+             "Built with Python and PySide6\n\n"
+             "Features:\n"
+             "• Syntax highlighting\n"
+             "• File explorer sidebar\n"
+             "• Find and replace\n"
+             "• Dark theme"
+         )
     
     def closeEvent(self, event):
         """Check all tabs for unsaved changes before closing."""

@@ -10815,6 +10815,28 @@ class TestAggressive95Coverage:
         assert len(selections) > 0
 
 
+class TestHelpMenu:
+    """Tests for the Help menu functionality."""
+    
+    def test_about_dialog_features_display_correctly(self, qtbot):
+        """Test that the About dialog displays features with correct bullet points."""
+        text_editor = TextEditor()
+        qtbot.addWidget(text_editor)
+        
+        # Mock QMessageBox.about to capture the message
+        with patch('main.QMessageBox.about') as mock_about:
+            text_editor.show_about()
+            
+            # Check that the dialog was called
+            assert mock_about.called
+            
+            # Get the message text (third argument - args[0] is self, args[1] is title)
+            message = mock_about.call_args[0][2]
+            
+            # Features should be properly displayed with bullet points, not garbled characters
+            assert "Features:" in message
+            assert "â€¢" not in message  # Ensure no garbled UTF-8 bullet points
+
 
 class TestUncoveredSections:
     """Tests for previously uncovered code sections from UNCOVERED_CODE_ANALYSIS2.md"""
