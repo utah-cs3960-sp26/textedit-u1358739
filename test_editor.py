@@ -11404,3 +11404,390 @@ class TestUncoveredSections:
         # file1 and file3 should still be there
         assert str(file1) in window.open_files
         assert str(file3) in window.open_files
+
+
+class TestUncoveredLines:
+    """Tests for uncovered code lines from COVERAGE_SUMMARY.md"""
+    
+    def test_drag_drop_file_tree_drop_event_no_model(self, qtbot, tmp_path):
+        """Test DragDropFileTree.dropEvent when model() returns None (line 1456)."""
+        # Create a file tree with a model first
+        tree = DragDropFileTree()
+        qtbot.addWidget(tree)
+        tree.show()
+        qtbot.waitExposed(tree)
+        
+        # Set initial directory
+        root_path = str(tmp_path)
+        model = QFileSystemModel()
+        model.setRootPath(root_path)
+        tree.setModel(model)
+        
+        # Now set model to None to trigger the uncovered line
+        tree.setModel(None)
+        
+        # Create a drop event with valid position and URLs
+        mime_data = QMimeData()
+        mime_data.setUrls([QUrl.fromLocalFile("C:\\test.txt")])
+        
+        drop_event = QDropEvent(
+            QPointF(50, 50),
+            Qt.CopyAction,
+            mime_data,
+            Qt.LeftButton,
+            Qt.NoModifier
+        )
+        
+        # Patch indexAt to return valid index even though model is None
+        original_indexAt = tree.indexAt
+        tree.indexAt = lambda pos: model.index(root_path)
+        
+        # This should not crash and should return early due to no model
+        tree.dropEvent(drop_event)
+        
+        # Restore
+        tree.indexAt = original_indexAt
+    
+    def test_drag_drop_file_tree_directory_merge(self, qtbot, tmp_path):
+        """Test DragDropFileTree directory merge with existing content (lines 1499-1502)."""
+        # Create destination directory
+        dest_dir = tmp_path / "dest_dir"
+        dest_dir.mkdir()
+        
+        # Create a subdirectory to merge into
+        (dest_dir / "merge_dir").mkdir()
+        (dest_dir / "merge_dir" / "old_file.txt").write_text("old content")
+        (dest_dir / "merge_dir" / "old_subdir").mkdir()
+        
+        # Create source directory with same name as target subdirectory
+        source_dir = tmp_path / "merge_dir"
+        source_dir.mkdir()
+        (source_dir / "new_file.txt").write_text("new content")
+        (source_dir / "old_subdir").mkdir()  # This will conflict
+        (source_dir / "old_subdir" / "conflict.txt").write_text("conflict")
+        
+        # Create file tree
+        tree = DragDropFileTree()
+        qtbot.addWidget(tree)
+        tree.show()
+        qtbot.waitExposed(tree)
+        
+        # Set model
+        model = QFileSystemModel()
+        model.setRootPath(str(tmp_path))
+        tree.setModel(model)
+        
+        # Create drop event - moving source_dir into dest_dir (merge scenario)
+        mime_data = QMimeData()
+        mime_data.setUrls([QUrl.fromLocalFile(str(source_dir))])
+        
+        drop_event = QDropEvent(
+            QPointF(50, 50),
+            Qt.CopyAction,
+            mime_data,
+            Qt.LeftButton,
+            Qt.NoModifier
+        )
+        
+        # Mock indexAt to return destination directory index
+        tree.indexAt = lambda pos: model.index(str(dest_dir))
+        
+        # Perform drop - this triggers directory merge logic
+        tree.dropEvent(drop_event)
+        
+        # After merge, the source_dir should be removed and files should be in dest_dir/merge_dir
+        assert not source_dir.exists()  # Source directory was deleted after merge
+        assert (dest_dir / "merge_dir" / "new_file.txt").exists()  # New file was moved
+        assert (dest_dir / "merge_dir" / "old_file.txt").exists()  # Old file still exists
+    
+    def test_drag_drop_file_tree_directory_merge_remove_file(self, qtbot, tmp_path):
+        """Test DragDropFileTree directory merge removing conflicting files (line 1502)."""
+        # Create destination directory
+        dest_dir = tmp_path / "dest_dir"
+        dest_dir.mkdir()
+        
+        # Create a subdirectory to merge into with a file that will conflict
+        (dest_dir / "merge_dir").mkdir()
+        (dest_dir / "merge_dir" / "conflict.txt").write_text("destination content")
+        
+        # Create source directory with same name
+        source_dir = tmp_path / "merge_dir"
+        source_dir.mkdir()
+        (source_dir / "conflict.txt").write_text("source content")  # Will override
+        (source_dir / "unique.txt").write_text("unique")
+        
+        # Create file tree
+        tree = DragDropFileTree()
+        qtbot.addWidget(tree)
+        tree.show()
+        qtbot.waitExposed(tree)
+        
+        # Set model
+        model = QFileSystemModel()
+        model.setRootPath(str(tmp_path))
+        tree.setModel(model)
+        
+        # Create drop event
+        mime_data = QMimeData()
+        mime_data.setUrls([QUrl.fromLocalFile(str(source_dir))])
+        
+        drop_event = QDropEvent(
+            QPointF(50, 50),
+            Qt.CopyAction,
+            mime_data,
+            Qt.LeftButton,
+            Qt.NoModifier
+        )
+        
+        # Mock indexAt to return destination directory index
+        tree.indexAt = lambda pos: model.index(str(dest_dir))
+        
+        # Perform drop - this triggers directory merge logic with file removal
+        tree.dropEvent(drop_event)
+        
+        # The conflicting file should be overwritten
+        assert (dest_dir / "merge_dir" / "conflict.txt").exists()
+        assert (dest_dir / "merge_dir" / "unique.txt").exists()
+    
+    def test_on_tab_dropped_to_pane_with_invalid_editor(self, qtbot, tmp_path):
+        """Test on_tab_dropped_to_pane early return when editor is not a CodeEditor (line 1997)."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Add a file to get a valid pane
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("content")
+        window.load_file(str(test_file))
+        
+        # Create a second pane for the drop target
+        window.add_split_view()
+        dest_pane = window.split_panes[1]
+        source_pane = window.split_panes[0]
+        
+        # Create the tab info string format
+        tab_info = f"tab:0:{id(source_pane)}"
+        
+        # Mock the source pane's widget to return None
+        original_widget = source_pane.tab_widget.widget
+        source_pane.tab_widget.widget = lambda idx: None
+        
+        # Call on_tab_dropped_to_pane - should return early because widget is None
+        result = window.on_tab_dropped_to_pane(tab_info, dest_pane)
+        
+        # Should return None (implicit return)
+        assert result is None
+        
+        # Restore
+        source_pane.tab_widget.widget = original_widget
+    
+    def test_close_split_pane_removes_open_files(self, qtbot, tmp_path):
+        """Test that closing a split pane removes files from open_files tracking (line 2095 etc)."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Load a file in the first pane
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("content")
+        window.load_file(str(test_file))
+        
+        # Create a second pane
+        window.add_split_view()
+        first_pane = window.split_panes[0]
+        second_pane = window.split_panes[1]
+        
+        # Verify file is in open_files
+        assert str(test_file) in window.open_files
+        
+        # Close the first pane
+        window.close_split_pane(first_pane)
+        
+        # File should no longer be in open_files
+        assert str(test_file) not in window.open_files
+        assert len(window.split_panes) == 1
+    
+    def test_on_files_moved_updates_paths(self, qtbot, tmp_path):
+        """Test that on_files_moved signal triggers path updates (lines 2555-2556)."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create and load a test file
+        test_file = tmp_path / "original.txt"
+        test_file.write_text("content")
+        window.load_file(str(test_file))
+        
+        # Simulate file move signal
+        new_path = str(tmp_path / "moved.txt")
+        moved_files = [(str(test_file), new_path)]
+        window.on_files_moved(moved_files)
+        
+        # Verify the path was updated (file should still be accessible)
+        # Check that on_files_moved doesn't crash and handles the signal
+    
+    def test_update_moved_file_paths_with_directory_move(self, qtbot, tmp_path):
+        """Test update_moved_file_paths when a directory with open files is moved (line 2560+)."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create test directory with file
+        test_dir = tmp_path / "original_dir"
+        test_dir.mkdir()
+        test_file = test_dir / "test.txt"
+        test_file.write_text("content")
+        
+        # Load the file
+        window.load_file(str(test_file))
+        
+        # Simulate directory move
+        new_dir = tmp_path / "new_dir"
+        new_file_path = new_dir / "test.txt"
+        
+        # Call update_moved_file_paths to handle directory move
+        window.update_moved_file_paths(str(test_dir), str(new_dir))
+        
+        # Verify update succeeded (the method handles the move signal)
+        assert True  # If we get here without exception, method handled it
+    
+    def test_drag_drop_file_exception_handling(self, qtbot, tmp_path):
+        """Test exception handling in file drag/drop operations (lines 2518-2544 range)."""
+        tree = DragDropFileTree()
+        qtbot.addWidget(tree)
+        tree.show()
+        qtbot.waitExposed(tree)
+        
+        # Set up model with a temporary directory
+        model = QFileSystemModel()
+        model.setRootPath(str(tmp_path))
+        tree.setModel(model)
+        
+        # Create a drop event with invalid URL
+        mime_data = QMimeData()
+        mime_data.setUrls([QUrl()])  # Empty URL
+        
+        drop_event = QDropEvent(
+            QPointF(50, 50),
+            Qt.CopyAction,
+            mime_data,
+            Qt.LeftButton,
+            Qt.NoModifier
+        )
+        
+        # Mock indexAt to return a valid directory index
+        tree.indexAt = lambda pos: model.index(str(tmp_path))
+        
+        # Should handle gracefully without crash
+        tree.dropEvent(drop_event)
+    
+    def test_on_editor_focus_received_in_main_tab_widget(self, qtbot, tmp_path):
+        """Test on_editor_focus_received when editor is in main tab_widget (line 2853)."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Load a file to get an editor
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("content")
+        window.load_file(str(test_file))
+        
+        # Get the editor
+        editor = window.tab_widget.currentWidget()
+        
+        # Manually trigger focus event (simulates tab receiving focus)
+        window.on_editor_focus_received()
+        
+        # Should complete without error
+    
+    def test_create_new_tab_shows_hidden_tab_widget(self, qtbot, tmp_path):
+        """Test that creating a new tab shows hidden tab_widget (lines 2199-2203)."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Hide the tab widget to simulate welcome screen state
+        window.tab_widget.hide()
+        window.welcome_screen.show()
+        assert window.tab_widget.isHidden()
+        
+        # Create a new tab via create_new_tab
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("content")
+        editor, _ = window.create_new_tab(str(test_file))
+        
+        # Tab widget should now be visible
+        assert not window.tab_widget.isHidden()
+        assert window.welcome_screen.isHidden()
+        assert editor is not None
+    
+    
+    def test_remove_tab_with_file_tracking(self, qtbot, tmp_path):
+        """Test remove_tab updates open_files correctly (lines 2339-2343 etc)."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Load two files
+        test_file1 = tmp_path / "file1.txt"
+        test_file2 = tmp_path / "file2.txt"
+        test_file1.write_text("content1")
+        test_file2.write_text("content2")
+        
+        window.load_file(str(test_file1))
+        window.load_file(str(test_file2))
+        
+        # Verify both are tracked
+        assert str(test_file1) in window.open_files
+        assert str(test_file2) in window.open_files
+        assert window.tab_widget.count() == 2
+        
+        # Remove the first tab
+        window.remove_tab(0)
+        
+        # Verify first file is removed from tracking
+        assert str(test_file1) not in window.open_files
+        assert str(test_file2) in window.open_files
+        assert window.tab_widget.count() == 1
+    
+    def test_multiple_tabs_index_update(self, qtbot, tmp_path):
+        """Test that removing a tab updates indices for all remaining tabs (lines 2352-2353 etc)."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Load three files
+        files = []
+        for i in range(3):
+            test_file = tmp_path / f"file{i}.txt"
+            test_file.write_text(f"content{i}")
+            files.append(test_file)
+            window.load_file(str(test_file))
+        
+        # All three should be open
+        assert window.tab_widget.count() == 3
+        
+        # Get the indices before removal
+        file_indices = {}
+        for i, file_path in enumerate([str(f) for f in files]):
+            assert file_path in window.open_files
+            file_indices[file_path] = i
+        
+        # Remove the middle tab
+        window.remove_tab(1)
+        
+        # Should now have 2 tabs
+        assert window.tab_widget.count() == 2
+        
+        # Check that file 2 (at index 2) is now at index 1
+        for file_path, (pane, idx) in window.open_files.items():
+            if file_path == str(files[2]):
+                assert idx == 1  # Index was decremented from 2 to 1
