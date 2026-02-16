@@ -11791,3 +11791,50 @@ class TestUncoveredLines:
         for file_path, (pane, idx) in window.open_files.items():
             if file_path == str(files[2]):
                 assert idx == 1  # Index was decremented from 2 to 1
+    
+    def test_save_current_file_with_no_file(self, qtbot):
+        """Test save_current_file returns save_file_as when current_file is None (lines 2375-2377)."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Ensure current_file is None
+        window.current_file = None
+        
+        # Mock save_file_as to verify it's called
+        from unittest.mock import patch
+        with patch.object(window, 'save_file_as', return_value=False) as mock_save_as:
+            result = window.save_current_file()
+            
+            # When current_file is None, should call save_file_as
+            mock_save_as.assert_called_once()
+            assert result is False
+    
+    def test_save_current_file_with_existing_file(self, qtbot, tmp_path):
+        """Test save_current_file calls save_to_file when current_file exists (line 2376)."""
+        window = TextEditor()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitExposed(window)
+        
+        # Create and load a file
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("original")
+        window.load_file(str(test_file))
+        
+        # Modify the editor
+        editor = window.tab_widget.currentWidget()
+        editor.setPlainText("modified")
+        editor.document().setModified(True)
+        
+        # Mock save_to_file to verify it's called
+        from unittest.mock import patch
+        with patch.object(window, 'save_to_file', return_value=True) as mock_save:
+            result = window.save_current_file()
+            
+            # When current_file exists, should call save_to_file
+            mock_save.assert_called_once_with(str(test_file))
+            assert result is True
+    
+
