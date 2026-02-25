@@ -57,7 +57,10 @@ class FrameTimerWidget(QLabel):
         self.frame_timer.timeout.connect(self.update_frame_timing)
         self.frame_timer.setInterval(16)  # ~60 FPS
         
-        # Track when we should idle
+        # Track frame timing
+        self.last_frame_tick = time.time()
+        
+        # Track when we should idle (for excluding idle time from averages)
         self.last_event_time = time.time()
         self.idle_threshold = 0.1  # 100ms of no events = idle
     
@@ -82,6 +85,8 @@ class FrameTimerWidget(QLabel):
         self.last_frame_time = 0.0
         self.max_frame_time = 0.0
         self.avg_frame_time = 0.0
+        self.last_frame_tick = time.time()
+        self.last_event_time = time.time()
     
     def record_activity(self):
         """Record that an event occurred (used to detect idle time)."""
@@ -93,21 +98,24 @@ class FrameTimerWidget(QLabel):
             return
         
         current_time = time.time()
-        time_since_event = current_time - self.last_event_time
         
-        # Only count as a real frame if we're not idle
+        # Calculate actual frame time (time since last tick)
+        frame_time = (current_time - self.last_frame_tick) * 1000  # Convert to ms
+        self.last_frame_tick = current_time
+        
+        # Only count frames if we're not idle (don't include idle time in averages)
+        time_since_event = current_time - self.last_event_time
         if time_since_event < self.idle_threshold:
-            # Subtract idle time from this measurement
-            frame_time = (time_since_event * 1000)  # Convert to ms
-            
             # Keep last 120 frames for averaging
             self.frame_times.append(frame_time)
             if len(self.frame_times) > 120:
                 self.frame_times.pop(0)
             
-            self.last_frame_time = frame_time
-            self.max_frame_time = max(self.frame_times)
+            self.max_frame_time = max(self.frame_times) if self.frame_times else 0.0
             self.avg_frame_time = sum(self.frame_times) / len(self.frame_times) if self.frame_times else 0.0
+        
+        # Always update last frame time for display
+        self.last_frame_time = frame_time
         
         self.update_display()
     
