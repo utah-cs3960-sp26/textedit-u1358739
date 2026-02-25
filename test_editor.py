@@ -441,7 +441,7 @@ class TestTextEditor:
         assert "Plain Text" in window.file_type_label.text()
 
 
-class TestFileOperations:
+class TestFileOperations: #####
     """Tests for file save/load operations."""
 
     def test_save_to_file(self, qtbot, tmp_path):
@@ -622,7 +622,7 @@ class TestFileOperations:
         assert window.editor.toPlainText() == unicode_content
 
 
-class TestFindReplaceDialog:
+class TestFindReplaceDialog:  ######
     """Tests for Find and Replace functionality."""
 
     def test_dialog_creation(self, qtbot):
@@ -692,7 +692,7 @@ class TestFindReplaceDialog:
         
         assert not editor.textCursor().hasSelection()
 
-    def test_replace_single(self, qtbot):
+    def test_replace_single(self, qtbot): #####
         editor = CodeEditor()
         qtbot.addWidget(editor)
         editor.setPlainText("Hello World")
@@ -899,7 +899,7 @@ class TestFindReplaceDialog:
         
         dialog = FindReplaceDialog(editor)
         qtbot.addWidget(dialog)
-        dialog.find_input.setText("what")
+        dialog.find_input.setText("what") ######
         dialog.replace_input.setText("what!")
         
         dialog.replace_all()
@@ -2166,7 +2166,7 @@ class TestTabs:
          assert len(window.open_files) == 2
 
 
-class TestMultiTabFunctionality:
+class TestMultiTabFunctionality: #####
     """Comprehensive tests for multi-tab functionality."""
 
     def test_new_file_creates_new_tab(self, qtbot):
@@ -2633,7 +2633,7 @@ class TestMultiTabFunctionality:
         assert (tmp_path / "saved_untitled.txt").read_text() == "unsaved content in untitled"
 
 
-class TestSplitView:
+class TestSplitView: #####
     """Tests for split view functionality."""
     
     def test_initial_state_has_one_pane(self, qtbot):
