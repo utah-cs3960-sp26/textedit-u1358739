@@ -128,7 +128,7 @@ def test_frame_timer_does_not_time_while_hidden(qtbot):
 
 
 def test_frame_timer_idle_detection(qtbot):
-    """Test that idle time is not counted."""
+    """Test that frame timings include idle frames."""
     widget = FrameTimerWidget()
     qtbot.addWidget(widget)
     
@@ -138,11 +138,13 @@ def test_frame_timer_idle_detection(qtbot):
     # Wait long enough to trigger idle (default idle_threshold is 0.1s)
     time.sleep(0.15)
     
-    # Update frame timing (should not record because we're idle)
+    # Update frame timing (will record because we always record frames now)
     widget.update_frame_timing()
     
-    # Should not have recorded because we were idle
-    assert len(widget.frame_times) == 0
+    # Should have recorded the frame time (including the idle time)
+    assert len(widget.frame_times) == 1
+    # The frame time should be large because of the sleep
+    assert widget.frame_times[0] > 100  # Should be ~150ms
 
 
 def test_frame_timer_activity_resets_idle(qtbot):

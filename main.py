@@ -103,19 +103,18 @@ class FrameTimerWidget(QLabel):
         frame_time = (current_time - self.last_frame_tick) * 1000  # Convert to ms
         self.last_frame_tick = current_time
         
-        # Only count frames if we're not idle (don't include idle time in averages)
-        time_since_event = current_time - self.last_event_time
-        if time_since_event < self.idle_threshold:
-            # Keep last 120 frames for averaging
-            self.frame_times.append(frame_time)
-            if len(self.frame_times) > 120:
-                self.frame_times.pop(0)
-            
-            self.max_frame_time = max(self.frame_times) if self.frame_times else 0.0
-            self.avg_frame_time = sum(self.frame_times) / len(self.frame_times) if self.frame_times else 0.0
+        # Always record frames
+        self.frame_times.append(frame_time)
+        if len(self.frame_times) > 120:
+            self.frame_times.pop(0)
         
         # Always update last frame time for display
         self.last_frame_time = frame_time
+        
+        # Always recalculate average and max on every frame update
+        if self.frame_times:
+            self.max_frame_time = max(self.frame_times)
+            self.avg_frame_time = sum(self.frame_times) / len(self.frame_times)
         
         self.update_display()
     
