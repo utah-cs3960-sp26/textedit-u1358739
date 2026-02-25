@@ -7,3 +7,6 @@ __pycache__/
 env/
 venv/
 .venv
+small.txt
+medium.txt
+large.txt
