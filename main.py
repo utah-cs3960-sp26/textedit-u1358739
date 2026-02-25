@@ -66,9 +66,9 @@ class FrameTimerWidget(QLabel):
     
     def start_timing(self):
         """Start measuring frame times."""
+        self.reset_timings()  # Reset all counters for a fresh start
         self.is_visible = True
         self.show()
-        self.last_event_time = time.time()
         self.frame_timer.start()
         self.update_display()
     
@@ -121,11 +121,16 @@ class FrameTimerWidget(QLabel):
     
     def update_display(self):
         """Update the display text."""
-        if not self.is_visible or not self.frame_times:
-            self.setText("Last Frame: -- ms | Avg: -- ms | Max: -- ms")
-        else:
-            text = f"Last Frame: {self.last_frame_time:.1f} ms | Avg: {self.avg_frame_time:.1f} ms | Max: {self.max_frame_time:.1f} ms"
-            self.setText(text)
+        if not self.is_visible:
+            return
+        
+        # Show frame times if we have any data, otherwise show placeholders
+        last_frame_str = f"{self.last_frame_time:.1f}" if self.last_frame_time > 0 else "--"
+        avg_str = f"{self.avg_frame_time:.1f}" if self.frame_times else "--"
+        max_str = f"{self.max_frame_time:.1f}" if self.frame_times else "--"
+        
+        text = f"Last Frame: {last_frame_str} ms | Avg: {avg_str} ms | Max: {max_str} ms"
+        self.setText(text)
 
 
 class WelcomeScreen(QWidget):
