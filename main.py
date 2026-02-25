@@ -48,7 +48,7 @@ class FrameTimerWidget(QLabel):
         # Frame timing data
         self.frame_times = []
         self.last_frame_time = 0.0
-        self.max_frame_time = 0.0
+        self.max_frame_time = 0.0  # Global max since session opened
         self.avg_frame_time = 0.0
         self.is_visible = False
         
@@ -111,9 +111,12 @@ class FrameTimerWidget(QLabel):
         # Always update last frame time for display
         self.last_frame_time = frame_time
         
-        # Always recalculate average and max on every frame update
+        # Update max: only increases, never decreases
+        if frame_time > self.max_frame_time:
+            self.max_frame_time = frame_time
+        
+        # Always recalculate average on every frame update (from recent frames)
         if self.frame_times:
-            self.max_frame_time = max(self.frame_times)
             self.avg_frame_time = sum(self.frame_times) / len(self.frame_times)
         
         self.update_display()
