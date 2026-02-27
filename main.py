@@ -1092,11 +1092,21 @@ class FindReplaceDialog(QDialog):
     def __init__(self, editor, parent=None):
         super().__init__(parent)
         self.editor = editor
+        self.parent_editor = parent
         self.setWindowTitle("Find and Replace")
         self.setFixedSize(400, 150)
         self.current_match_index = 0
         self.all_matches = []
         self.setup_ui()
+    
+    def keyPressEvent(self, event):
+        """Handle key press events, allowing Ctrl+P to toggle frame timer."""
+        if event.key() == Qt.Key_P and event.modifiers() == Qt.ControlModifier:
+            # Toggle frame timer in parent editor
+            if self.parent_editor and hasattr(self.parent_editor, 'toggle_frame_timer'):
+                self.parent_editor.toggle_frame_timer()
+            return
+        super().keyPressEvent(event)
     
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -1399,9 +1409,19 @@ class MultiFileSearchDialog(QDialog):
         super().__init__(parent)
         self.folder_path = folder_path
         self.text_editor = text_editor_instance
+        self.parent_editor = parent
         self.setWindowTitle("Multi-File Find and Replace")
         self.setGeometry(100, 100, 500, 250)
         self.setup_ui()
+    
+    def keyPressEvent(self, event):
+        """Handle key press events, allowing Ctrl+P to toggle frame timer."""
+        if event.key() == Qt.Key_P and event.modifiers() == Qt.ControlModifier:
+            # Toggle frame timer in parent editor
+            if self.parent_editor and hasattr(self.parent_editor, 'toggle_frame_timer'):
+                self.parent_editor.toggle_frame_timer()
+            return
+        super().keyPressEvent(event)
     
     def setup_ui(self):
         layout = QVBoxLayout(self)
