@@ -1,5 +1,6 @@
 import sys
 import os
+import mmap
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QPlainTextEdit, QWidget, QVBoxLayout,
     QHBoxLayout, QFileDialog, QMessageBox, QStatusBar, QMenuBar,
@@ -955,6 +956,7 @@ class CodeEditor(QPlainTextEdit):
         
         # Setup syntax highlighter
         self.highlighter = SyntaxHighlighter(self.document())
+        self.highlighting_enabled = True
         
         self.blockCountChanged.connect(self.update_line_number_area_width)
         self.updateRequest.connect(self.update_line_number_area)
@@ -978,6 +980,16 @@ class CodeEditor(QPlainTextEdit):
     
     def set_language_from_file(self, file_path):
         """Set syntax highlighting based on file extension."""
+        # Disable highlighting for files larger than 5MB to improve performance
+        try:
+            file_size = os.path.getsize(file_path)
+            if file_size > 5 * 1024 * 1024:  # 5MB threshold
+                self.highlighting_enabled = False
+                return
+        except:
+            pass
+        
+        self.highlighting_enabled = True
         self.highlighter.set_language_from_file(file_path)
     
     def set_text_color(self, color):
@@ -2747,9 +2759,18 @@ class TextEditor(QMainWindow):
                     return
                 # If file is in a different pane, we'll open it in the active pane (don't return, continue below)
             
-            # Load file content
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            # Load file content with mmap for large files
+            file_size = os.path.getsize(file_path)
+            
+            if file_size > 10 * 1024 * 1024:  # 10MB threshold for mmap
+                # Use memory-mapped file for very large files
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mmapped_file:
+                        content = mmapped_file.read().decode('utf-8', errors='ignore')
+            else:
+                # Normal read for smaller files
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
             
             # Use current tab if it's untitled and unmodified, otherwise create new tab
             current_index = self.tab_widget.currentIndex()
