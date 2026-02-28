@@ -957,9 +957,14 @@ class CodeEditor(QPlainTextEdit):
         # Setup syntax highlighter
         self.highlighter = SyntaxHighlighter(self.document())
         self.highlighting_enabled = True
+        self.is_large_file = False
+        self.highlighted_blocks = set()  # Track which blocks have been highlighted
+        self.highlight_timer = QTimer()
+        self.highlight_timer.timeout.connect(self.highlight_remaining_blocks)
+        self.highlight_timer.setInterval(50)  # Highlight in chunks every 50ms
         
         self.blockCountChanged.connect(self.update_line_number_area_width)
-        self.updateRequest.connect(self.update_line_number_area)
+        self.updateRequest.connect(self.on_update_request)
         self.cursorPositionChanged.connect(self.highlight_current_line)
         
         self.update_line_number_area_width(0)
@@ -980,17 +985,23 @@ class CodeEditor(QPlainTextEdit):
     
     def set_language_from_file(self, file_path):
         """Set syntax highlighting based on file extension."""
-        # Disable highlighting for files larger than 5MB to improve performance
+        # Mark as large file if > 5MB for lazy highlighting
         try:
             file_size = os.path.getsize(file_path)
-            if file_size > 5 * 1024 * 1024:  # 5MB threshold
-                self.highlighting_enabled = False
-                return
+            self.is_large_file = file_size > 5 * 1024 * 1024  # 5MB threshold
         except:
-            pass
+            self.is_large_file = False
         
         self.highlighting_enabled = True
         self.highlighter.set_language_from_file(file_path)
+        
+        # For large files, highlight only visible blocks initially
+        if self.is_large_file:
+            self.highlight_visible_blocks()
+            self.highlight_timer.start()
+        else:
+            # For small files, highlight everything immediately
+            self.highlighter.rehighlight()
     
     def set_text_color(self, color):
         """Set the text color for the editor."""
@@ -1020,7 +1031,9 @@ class CodeEditor(QPlainTextEdit):
     def update_line_number_area_width(self, _):
         self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
     
-    def update_line_number_area(self, rect, dy):
+    def on_update_request(self, rect, dy):
+        """Handle viewport updates and lazy highlight new visible blocks."""
+        # Update line numbers
         if dy:
             self.line_number_area.scroll(0, dy)
         else:
@@ -1028,6 +1041,62 @@ class CodeEditor(QPlainTextEdit):
                                          self.line_number_area.width(), rect.height())
         if rect.contains(self.viewport().rect()):
             self.update_line_number_area_width(0)
+        
+        # Highlight newly visible blocks for large files
+        if self.is_large_file:
+            self.highlight_visible_blocks()
+    
+    def highlight_visible_blocks(self):
+        """Highlight only the blocks currently visible in the viewport."""
+        if not self.highlighting_enabled or not self.is_large_file:
+            return
+        
+        block = self.firstVisibleBlock()
+        end_block = None
+        
+        # Find the last visible block
+        current_block = block
+        while current_block.isValid():
+            rect = self.blockBoundingGeometry(current_block).translated(self.contentOffset())
+            if rect.top() > self.viewport().rect().bottom():
+                break
+            end_block = current_block
+            current_block = current_block.next()
+        
+        # Highlight visible blocks
+        current_block = block
+        while current_block.isValid():
+            block_num = current_block.blockNumber()
+            if block_num not in self.highlighted_blocks:
+                self.highlighter.highlightBlock(current_block.text())
+                self.highlighted_blocks.add(block_num)
+            
+            if current_block == end_block:
+                break
+            current_block = current_block.next()
+    
+    def highlight_remaining_blocks(self):
+        """Incrementally highlight remaining unhighlighted blocks."""
+        if not self.highlighting_enabled or not self.is_large_file:
+            self.highlight_timer.stop()
+            return
+        
+        # Highlight up to 100 blocks per timer tick to avoid UI freezing
+        blocks_to_highlight = 100
+        count = 0
+        block = self.document().firstBlock()
+        
+        while block.isValid() and count < blocks_to_highlight:
+            block_num = block.blockNumber()
+            if block_num not in self.highlighted_blocks:
+                self.highlighter.highlightBlock(block.text())
+                self.highlighted_blocks.add(block_num)
+                count += 1
+            block = block.next()
+        
+        # Stop timer if all blocks are highlighted
+        if count == 0:
+            self.highlight_timer.stop()
     
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1244,15 +1313,34 @@ class FindReplaceDialog(QDialog):
         if find_text:
             import re
             content = self.editor.toPlainText()
-            new_content = re.sub(re.escape(find_text), replace_text, content, flags=re.IGNORECASE)
+            
+            # Count matches before replacement
+            pattern = re.escape(find_text)
+            matches = len(re.findall(pattern, content, flags=re.IGNORECASE))
+            
+            # Replace all at once (much faster than iterating)
+            new_content = re.sub(pattern, replace_text, content, flags=re.IGNORECASE)
+            
             if new_content != content:
+                # Use edit block for proper undo support
                 cursor = self.editor.textCursor()
                 cursor.beginEditBlock()
                 cursor.select(QTextCursor.Document)
                 cursor.insertText(new_content)
                 cursor.endEditBlock()
-                # Don't highlight after replace_all - it interferes with undo
-                # The highlighting will be updated if the user makes another find
+                self.editor.document().setModified(True)
+            
+            # Show result (defer to avoid blocking in tests)
+            QTimer.singleShot(0, lambda: self._show_replace_result(matches))
+    
+    def _show_replace_result(self, matches):
+        """Show replace result in a non-blocking way."""
+        # Only show message if dialog is visible (skip in tests)
+        if self.isVisible():
+            if matches > 0:
+                QMessageBox.information(self, "Replace Complete", f"Replaced {matches} occurrences.")
+            else:
+                QMessageBox.information(self, "No Matches", "No matches found to replace.")
 
 
 class SearchResultButton(QWidget):
@@ -1526,27 +1614,32 @@ class MultiFileSearchDialog(QDialog):
             QMessageBox.information(self, "No Results", "No matches found.")
             return
         
-        # Group results by file
-        files_to_replace = {}
+        # Group results by file - only need file paths, not individual matches
+        files_to_replace = set()
         for file_path, line_num, line, match_pos, match_text in results:
-            if file_path not in files_to_replace:
-                files_to_replace[file_path] = []
-            files_to_replace[file_path].append((line_num, find_text, replace_text))
+            files_to_replace.add(file_path)
         
         # Replace in each file
+        import re
         replaced_count = 0
+        pattern = re.escape(find_text)
+        
         for file_path in files_to_replace:
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 
+                # Count matches before replacement (do it once)
+                match_count = len(re.findall(pattern, content, flags=re.IGNORECASE))
+                
                 # Replace all occurrences
-                import re
-                new_content = re.sub(re.escape(find_text), replace_text, content, flags=re.IGNORECASE)
+                new_content = re.sub(pattern, replace_text, content, flags=re.IGNORECASE)
                 
                 if new_content != content:
                     with open(file_path, 'w', encoding='utf-8') as f:
                         f.write(new_content)
+                    
+                    replaced_count += match_count
                     
                     # Update any open tabs with this file
                     if file_path in self.text_editor.open_files:
@@ -1555,10 +1648,6 @@ class MultiFileSearchDialog(QDialog):
                         if editor:
                             editor.setPlainText(new_content)
                             editor.document().setModified(True)
-                    
-                    # Count replacements
-                    original_count = len(re.findall(re.escape(find_text), content, re.IGNORECASE))
-                    replaced_count += original_count
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Could not process {file_path}: {e}")
         

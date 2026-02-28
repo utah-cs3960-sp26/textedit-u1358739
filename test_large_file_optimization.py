@@ -10,8 +10,8 @@ from main import TextEditor, CodeEditor
 class TestLargeFileOptimization:
     """Tests for large file handling optimizations."""
 
-    def test_syntax_highlighting_disabled_for_large_files(self, qtbot, tmp_path):
-        """Verify syntax highlighting is disabled for files > 5MB."""
+    def test_syntax_highlighting_lazy_for_large_files(self, qtbot, tmp_path):
+        """Verify lazy highlighting is enabled for files > 5MB."""
         editor = CodeEditor()
         qtbot.addWidget(editor)
         
@@ -20,11 +20,15 @@ class TestLargeFileOptimization:
         file_path = tmp_path / "large_file_6mb.txt"
         file_path.write_text(large_content, encoding='utf-8')
         
-        # Set language from file - should disable highlighting
+        # Set language from file - should enable lazy highlighting
         editor.set_language_from_file(str(file_path))
         
-        # Verify highlighting is disabled
-        assert editor.highlighting_enabled is False
+        # Verify large file flag is set
+        assert editor.is_large_file is True
+        # Verify highlighting is still enabled
+        assert editor.highlighting_enabled is True
+        # Verify timer was started for lazy highlighting
+        assert editor.highlight_timer.isActive()
 
     def test_syntax_highlighting_enabled_for_small_files(self, qtbot, tmp_path):
         """Verify syntax highlighting is enabled for files < 5MB."""

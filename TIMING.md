@@ -16,11 +16,11 @@ Max Find & Replace: 72 ms
 Total Memory Used : 62.2 MB
 
 Large.txt
-Max Opening File  : 14862 ms
+Max Opening File  : 16187 ms
 Max Scroll        : 33 ms
 Max Click Far Away: 35 ms
 Avg Click Far Away: 17 ms
-Max Find & Replace: 82755 ms
+Max Find & Replace: 18206 ms
 Total Memory Used : 1.457 GB
 
 
