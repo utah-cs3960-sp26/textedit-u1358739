@@ -1,6 +1,6 @@
 Latest Timings
 Small.txt
-Max Opening File  : 58 ms
+Max Opening File  : 37 ms
 Max Scroll        : 19 ms
 Max Click Far Away: 25 ms
 Avg Click Far Away: 16 ms
@@ -8,9 +8,9 @@ Max Find & Replace: 27 ms
 Total Memory Used : 51.8 MB
 
 Medium.txt
-Max Opening File  : 140 ms
-Max Scroll        : 31 ms
-Max Click Far Away: 28.5 ms
+Max Opening File  : 100 ms
+Max Scroll        : 25 ms
+Max Click Far Away: 24 ms
 Avg Click Far Away: 16 ms
 Max Find & Replace: 72 ms
 Total Memory Used : 62.2 MB

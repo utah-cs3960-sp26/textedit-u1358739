@@ -91,7 +91,7 @@ class TimingTestBase:
             time.sleep(0.001)
             
             # Check if loading is complete
-            if not hasattr(self.editor.editor, '_load_chunks') and \
+            if not hasattr(self.editor.editor, '_load_content') and \
                (not hasattr(self.editor.editor, '_pending_file_load') or 
                 self.editor.editor._pending_file_load is None):
                 break
@@ -151,7 +151,7 @@ class TestSmallFile(TimingTestBase):
         while time.time() < timeout:
             QApplication.processEvents()
             time.sleep(0.001)
-            if not hasattr(self.editor.editor, '_load_chunks') and \
+            if not hasattr(self.editor.editor, '_load_content') and \
                (not hasattr(self.editor.editor, '_pending_file_load') or 
                 self.editor.editor._pending_file_load is None):
                 break
@@ -271,7 +271,7 @@ class TestMediumFile(TimingTestBase):
         while time.time() < timeout:
             QApplication.processEvents()
             time.sleep(0.001)
-            if not hasattr(self.editor.editor, '_load_chunks') and \
+            if not hasattr(self.editor.editor, '_load_content') and \
                (not hasattr(self.editor.editor, '_pending_file_load') or 
                 self.editor.editor._pending_file_load is None):
                 break
@@ -396,7 +396,7 @@ class TestLargeFile(TimingTestBase):
         while time.time() < timeout:
             QApplication.processEvents()
             time.sleep(0.001)
-            if not hasattr(self.editor.editor, '_load_chunks') and \
+            if not hasattr(self.editor.editor, '_load_content') and \
                (not hasattr(self.editor.editor, '_pending_file_load') or 
                 self.editor.editor._pending_file_load is None):
                 break

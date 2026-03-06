@@ -46,7 +46,7 @@ def wait_for_deferred_load(editor, timeout=5):
         
         # Check if loading is complete
         if (not hasattr(editor, '_pending_file_load') or editor._pending_file_load is None) and \
-           not hasattr(editor, '_load_chunks'):
+           not hasattr(editor, '_load_content'):
             return True
         
         time.sleep(0.001)

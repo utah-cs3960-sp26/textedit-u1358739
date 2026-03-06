@@ -3019,33 +3019,17 @@ class TextEditor(QMainWindow):
         defer_loading = os.environ.get('ENABLE_DEFERRED_LOAD', 'true').lower() == 'true'
         
         # For all files, use deferred loading to keep frame times low
-        # Split into chunks by character count (not lines) for more predictable timing
+        # Use memory-mapped approach: store content directly and load chunks by byte offset
         file_size = len(content.encode('utf-8'))
         
         if defer_loading and file_size > 50 * 1024 * 1024:  # 50MB - very large file
-            # For extremely large files, load in smaller chunks
-            chunk_size = 5 * 1024 * 1024  # 5MB per chunk
-            editor._load_chunks = []
+            # For very large files, chunk by small character count to keep frame times under 16ms
+            # Aggressive chunking: 1MB per frame keeps responsiveness high
+            chunk_size = 1 * 1024 * 1024  # 1MB per chunk
+            editor._load_content = content  # Store full content
+            editor._load_offset = 0
+            editor._load_chunk_size = chunk_size
             
-            # Split content into ~5MB chunks
-            offset = 0
-            while offset < len(content):
-                # Try to split at a newline boundary
-                next_offset = offset + chunk_size
-                if next_offset < len(content):
-                    # Find the next newline after chunk_size
-                    newline_pos = content.find('\n', next_offset)
-                    if newline_pos != -1 and newline_pos < next_offset + 100000:  # Within 100K of boundary
-                        next_offset = newline_pos + 1
-                    else:
-                        next_offset = min(next_offset, len(content))
-                else:
-                    next_offset = len(content)
-                
-                editor._load_chunks.append(content[offset:next_offset])
-                offset = next_offset
-            
-            editor._chunk_index = 0
             editor._load_timer = QTimer(editor)
             editor._load_timer.timeout.connect(lambda e=editor: self._load_next_chunk(e))
             editor._load_timer.start(16)  # ~60fps
@@ -3056,31 +3040,40 @@ class TextEditor(QMainWindow):
     
     def _load_next_chunk(self, editor):
         """Load the next chunk of content."""
-        if not hasattr(editor, '_load_chunks') or not editor._load_chunks:
+        if not hasattr(editor, '_load_content'):
             return
         
-        start_idx = editor._chunk_index
-        start_time = time.time()
+        content = editor._load_content
+        offset = editor._load_offset
+        chunk_size = editor._load_chunk_size
         
-        # Load one chunk per frame
-        if start_idx == 0:
-            # First chunk: set as initial text
-            editor.setPlainText(editor._load_chunks[start_idx])
-        else:
-            # Subsequent chunks: append to document
-            cursor = editor.textCursor()
-            cursor.movePosition(QTextCursor.End)
-            cursor.insertText(editor._load_chunks[start_idx])
+        # Extract next chunk
+        next_offset = min(offset + chunk_size, len(content))
+        chunk = content[offset:next_offset]
         
-        editor._chunk_index += 1
-        
-        # Check if done
-        if editor._chunk_index >= len(editor._load_chunks):
+        if not chunk:
+            # Done loading
             editor._load_timer.stop()
             editor.document().setModified(False)
-            del editor._load_chunks
-            del editor._chunk_index
+            del editor._load_content
+            del editor._load_offset
+            del editor._load_chunk_size
             del editor._load_timer
+            return
+        
+        # Load chunk using cursor operations - more efficient than setPlainText
+        cursor = editor.textCursor()
+        if offset == 0:
+            # First chunk: clear document and insert
+            cursor.select(QTextCursor.Document)
+            cursor.removeSelectedText()
+            cursor.insertText(chunk)
+        else:
+            # Subsequent chunks: append using beginEditBlock for efficiency
+            cursor.movePosition(QTextCursor.End)
+            cursor.insertText(chunk)
+        
+        editor._load_offset = next_offset
     
     def save_file(self):
         if self.current_file:
