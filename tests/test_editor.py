@@ -11925,3 +11925,86 @@ class TestMainEntry:
         # (we can't test sys.exit() without ending the test runner)
 
 
+class TestViewportMargins:
+    """Tests for viewport margins alignment when opening files."""
+    
+    def test_viewport_margins_set_on_first_open(self, qtbot):
+        """Test that viewport margins are properly set when a file is first opened."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.show()
+        qtbot.waitExposed(editor)
+        
+        # Set some text content
+        editor.setPlainText("#!/usr/bin/env python3\nLine 2\nLine 3")
+        editor.resize(800, 600)  # Simulate resize event
+        
+        # The viewport left margin should be set to line_number_area_width
+        expected_margin = editor.line_number_area_width()
+        actual_margins = editor.viewportMargins()
+        
+        # Left margin (index 0 of QMargins) should match line number area width
+        assert actual_margins.left() == expected_margin, \
+            f"Left viewport margin {actual_margins.left()} doesn't match expected {expected_margin}"
+        
+        # Verify the line number area is positioned at x=0, not offset
+        line_area_geometry = editor.line_number_area.geometry()
+        assert line_area_geometry.left() == 0, \
+            f"Line number area left position {line_area_geometry.left()} should be 0"
+        
+        # Verify line number area width is correct
+        assert line_area_geometry.width() == expected_margin, \
+            f"Line number area width {line_area_geometry.width()} doesn't match {expected_margin}"
+    
+    def test_viewport_margins_after_dynamic_resize(self, qtbot):
+        """Test that viewport margins remain correct after resizing the editor."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.show()
+        qtbot.waitExposed(editor)
+        
+        # Set text with many lines to increase line number width
+        lines = [f"Line {i}" for i in range(1, 201)]
+        editor.setPlainText("\n".join(lines))
+        
+        # Initial resize
+        editor.resize(400, 300)
+        margin_1 = editor.viewportMargins().left()
+        width_1 = editor.line_number_area_width()
+        assert margin_1 == width_1
+        
+        # Resize to larger
+        editor.resize(800, 600)
+        margin_2 = editor.viewportMargins().left()
+        width_2 = editor.line_number_area_width()
+        assert margin_2 == width_2
+        
+        # Line number area should still be at x=0
+        assert editor.line_number_area.geometry().left() == 0
+    
+    def test_text_not_cut_off_with_line_numbers(self, qtbot):
+        """Test that text starting character is not cut off by line numbers."""
+        editor = CodeEditor()
+        qtbot.addWidget(editor)
+        editor.show()
+        qtbot.waitExposed(editor)
+        
+        # Use text that starts with a special character that could be cut off
+        test_text = "#!/usr/bin/env python3\n#comment\n_private_var = 42"
+        editor.setPlainText(test_text)
+        editor.resize(600, 400)
+        
+        # Get the viewport margins
+        margins = editor.viewportMargins()
+        
+        # The left margin should be positive (accounting for line numbers)
+        assert margins.left() > 0, "Left viewport margin should be positive"
+        
+        # The viewport content rect should start after the line number area
+        content_rect = editor.contentsRect()
+        line_area_width = editor.line_number_area_width()
+        
+        # Content rect left should not overlap with line number area
+        assert content_rect.left() + margins.left() >= line_area_width
+
+

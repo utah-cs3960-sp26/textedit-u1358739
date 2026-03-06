@@ -1119,9 +1119,11 @@ class CodeEditor(QPlainTextEdit):
     
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        # Ensure viewport margins are set before positioning the line number area
+        self.update_line_number_area_width(0)
         cr = self.contentsRect()
         self.line_number_area.setGeometry(
-            QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height())
+            QRect(0, cr.top(), self.line_number_area_width(), cr.height())
         )
     
     def highlight_current_line(self):
