@@ -1043,8 +1043,13 @@ class CodeEditor(QPlainTextEdit):
             self.update_line_number_area_width(0)
         
         # Highlight newly visible blocks for large files
-        if self.is_large_file:
-            self.highlight_visible_blocks()
+        # Only call if viewport actually changed (not just cursor position change)
+        if self.is_large_file and dy != 0:
+            # Cache previous visible blocks to avoid redundant highlighting
+            current_first = self.firstVisibleBlock().blockNumber()
+            if not hasattr(self, '_last_visible_block') or self._last_visible_block != current_first:
+                self._last_visible_block = current_first
+                self.highlight_visible_blocks()
     
     def highlight_visible_blocks(self):
         """Highlight only the blocks currently visible in the viewport."""
@@ -1081,8 +1086,10 @@ class CodeEditor(QPlainTextEdit):
             self.highlight_timer.stop()
             return
         
-        # Highlight up to 100 blocks per timer tick to avoid UI freezing
-        blocks_to_highlight = 100
+        # Dynamically adjust blocks per frame to keep frame time under 14ms
+        # Start with 20 blocks per frame for safety, measuring will adjust
+        blocks_to_highlight = getattr(self, '_highlight_blocks_per_frame', 20)
+        start_time = time.time()
         count = 0
         block = self.document().firstBlock()
         
@@ -1093,6 +1100,14 @@ class CodeEditor(QPlainTextEdit):
                 self.highlighted_blocks.add(block_num)
                 count += 1
             block = block.next()
+        
+        # Measure frame time and adjust for next frame
+        frame_time = (time.time() - start_time) * 1000  # Convert to ms
+        if frame_time > 0 and count > 0:
+            # Calculate blocks per frame to hit ~10ms target (leaving 6ms buffer)
+            target_ms = 10.0
+            new_blocks = max(1, int(blocks_to_highlight * (target_ms / frame_time)))
+            self._highlight_blocks_per_frame = new_blocks
         
         # Stop timer if all blocks are highlighted
         if count == 0:
@@ -1318,20 +1333,87 @@ class FindReplaceDialog(QDialog):
             pattern = re.escape(find_text)
             matches = len(re.findall(pattern, content, flags=re.IGNORECASE))
             
-            # Replace all at once (much faster than iterating)
-            new_content = re.sub(pattern, replace_text, content, flags=re.IGNORECASE)
+            # For large content, defer the actual replacement to keep frames responsive
+            if len(content) > 10 * 1024 * 1024:  # 10MB threshold
+                # Store state for chunked processing
+                self._replace_state = {
+                    'pattern': pattern,
+                    'replace_text': replace_text,
+                    'lines': content.split('\n'),
+                    'line_index': 0,
+                    'total_matches': matches,
+                    'replaced_count': 0
+                }
+                # Start chunked replacement
+                self._replace_timer = QTimer(self.editor)
+                self._replace_timer.timeout.connect(self._replace_next_chunk)
+                self._replace_timer.start(16)  # ~60fps
+            else:
+                # For smaller files, do replacement all at once
+                new_content = re.sub(pattern, replace_text, content, flags=re.IGNORECASE)
+                
+                if new_content != content:
+                    # Use edit block for proper undo support
+                    cursor = self.editor.textCursor()
+                    cursor.beginEditBlock()
+                    cursor.select(QTextCursor.Document)
+                    cursor.insertText(new_content)
+                    cursor.endEditBlock()
+                    self.editor.document().setModified(True)
+                
+                # Show result (defer to avoid blocking in tests)
+                QTimer.singleShot(0, lambda: self._show_replace_result(matches))
+    
+    def _replace_next_chunk(self):
+        """Process the next chunk of lines for find and replace."""
+        if not hasattr(self, '_replace_state'):
+            return
+        
+        state = self._replace_state
+        import re
+        
+        # Dynamically adjust lines per frame to fit in ~12ms (leaving 4ms buffer for other tasks)
+        lines_per_frame = getattr(self, '_replace_lines_per_frame', 5000)
+        start_idx = state['line_index']
+        start_time = time.time()
+        end_idx = min(start_idx + lines_per_frame, len(state['lines']))
+        
+        for i in range(start_idx, end_idx):
+            line = state['lines'][i]
+            new_line = re.sub(state['pattern'], state['replace_text'], line, flags=re.IGNORECASE)
+            if new_line != line:
+                state['replaced_count'] += len(re.findall(state['pattern'], line, flags=re.IGNORECASE))
+            state['lines'][i] = new_line
+        
+        # Measure frame time and adjust for next frame
+        frame_time = (time.time() - start_time) * 1000
+        lines_processed = end_idx - start_idx
+        if frame_time > 0 and lines_processed > 0:
+            target_ms = 12.0
+            new_lines = max(100, int(lines_processed * (target_ms / frame_time)))
+            self._replace_lines_per_frame = new_lines
+        
+        state['line_index'] = end_idx
+        
+        # Check if we're done
+        if end_idx >= len(state['lines']):
+            # Join back the lines and update editor
+            new_content = '\n'.join(state['lines'])
+            cursor = self.editor.textCursor()
+            cursor.beginEditBlock()
+            cursor.select(QTextCursor.Document)
+            cursor.insertText(new_content)
+            cursor.endEditBlock()
+            self.editor.document().setModified(True)
             
-            if new_content != content:
-                # Use edit block for proper undo support
-                cursor = self.editor.textCursor()
-                cursor.beginEditBlock()
-                cursor.select(QTextCursor.Document)
-                cursor.insertText(new_content)
-                cursor.endEditBlock()
-                self.editor.document().setModified(True)
+            # Clean up
+            self._replace_timer.stop()
+            del self._replace_timer
+            matches = state['total_matches']
+            del self._replace_state
             
-            # Show result (defer to avoid blocking in tests)
-            QTimer.singleShot(0, lambda: self._show_replace_result(matches))
+            # Show result
+            QTimer.singleShot(0, lambda m=matches: self._show_replace_result(m))
     
     def _show_replace_result(self, matches):
         """Show replace result in a non-blocking way."""
@@ -2838,6 +2920,8 @@ class TextEditor(QMainWindow):
 
     def load_file(self, file_path):
         try:
+            import os  # Import at top of function for availability throughout
+            
             # Check if file is already open in the active pane's current tab
             if file_path in self.open_files:
                 pane_info = self.open_files[file_path]
@@ -2882,8 +2966,8 @@ class TextEditor(QMainWindow):
                 # Create new tab for this file
                 editor, _ = self.create_new_tab(file_path)
             
-            editor.setPlainText(content)
-            editor.document().setModified(False)
+            # Check if deferred loading is enabled
+            defer_loading = os.environ.get('ENABLE_DEFERRED_LOAD', 'true').lower() == 'true'
             
             # Store saved content for comparison
             tab_index = self.tab_widget.currentIndex()
@@ -2905,10 +2989,98 @@ class TextEditor(QMainWindow):
             editor.set_language_from_file(file_path)
             self._update_language_menu_state(editor.highlighter.language)
             
+            if defer_loading:
+                # Defer setting plain text to next frame to avoid UI blocking
+                editor._pending_file_load = (file_path, content)
+                # Defer actual text loading to next frame
+                QTimer.singleShot(0, lambda e=editor, fp=file_path: self._deferred_load_text(e, fp))
+            else:
+                # Deferred loading disabled - load immediately (for tests)
+                editor.setPlainText(content)
+                editor.document().setModified(False)
+            
             # Focus on editor so user can start typing immediately
             editor.setFocus()
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             QMessageBox.critical(self, "Error", f"Could not open file:\n{e}")
+    
+    def _deferred_load_text(self, editor, file_path):
+        """Load text into editor in deferred mode to spread across frames."""
+        if not hasattr(editor, '_pending_file_load') or editor._pending_file_load is None:
+            return
+        
+        _, content = editor._pending_file_load
+        editor._pending_file_load = None
+        
+        # Check if deferred loading is enabled (disabled during tests by default)
+        import os
+        defer_loading = os.environ.get('ENABLE_DEFERRED_LOAD', 'true').lower() == 'true'
+        
+        # For all files, use deferred loading to keep frame times low
+        # Split into chunks by character count (not lines) for more predictable timing
+        file_size = len(content.encode('utf-8'))
+        
+        if defer_loading and file_size > 50 * 1024 * 1024:  # 50MB - very large file
+            # For extremely large files, load in smaller chunks
+            chunk_size = 5 * 1024 * 1024  # 5MB per chunk
+            editor._load_chunks = []
+            
+            # Split content into ~5MB chunks
+            offset = 0
+            while offset < len(content):
+                # Try to split at a newline boundary
+                next_offset = offset + chunk_size
+                if next_offset < len(content):
+                    # Find the next newline after chunk_size
+                    newline_pos = content.find('\n', next_offset)
+                    if newline_pos != -1 and newline_pos < next_offset + 100000:  # Within 100K of boundary
+                        next_offset = newline_pos + 1
+                    else:
+                        next_offset = min(next_offset, len(content))
+                else:
+                    next_offset = len(content)
+                
+                editor._load_chunks.append(content[offset:next_offset])
+                offset = next_offset
+            
+            editor._chunk_index = 0
+            editor._load_timer = QTimer(editor)
+            editor._load_timer.timeout.connect(lambda e=editor: self._load_next_chunk(e))
+            editor._load_timer.start(16)  # ~60fps
+        else:
+            # Load all at once (either deferred loading disabled or file is small enough)
+            editor.setPlainText(content)
+            editor.document().setModified(False)
+    
+    def _load_next_chunk(self, editor):
+        """Load the next chunk of content."""
+        if not hasattr(editor, '_load_chunks') or not editor._load_chunks:
+            return
+        
+        start_idx = editor._chunk_index
+        start_time = time.time()
+        
+        # Load one chunk per frame
+        if start_idx == 0:
+            # First chunk: set as initial text
+            editor.setPlainText(editor._load_chunks[start_idx])
+        else:
+            # Subsequent chunks: append to document
+            cursor = editor.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            cursor.insertText(editor._load_chunks[start_idx])
+        
+        editor._chunk_index += 1
+        
+        # Check if done
+        if editor._chunk_index >= len(editor._load_chunks):
+            editor._load_timer.stop()
+            editor.document().setModified(False)
+            del editor._load_chunks
+            del editor._chunk_index
+            del editor._load_timer
     
     def save_file(self):
         if self.current_file:

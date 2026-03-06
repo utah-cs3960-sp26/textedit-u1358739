@@ -1392,6 +1392,8 @@ class TestEditorIntegration:
         assert window.editor.font().pointSize() == initial_size + 2
 
     def test_large_file_handling(self, qtbot, tmp_path):
+        from conftest import wait_for_deferred_load
+        
         window = TextEditor()
         qtbot.addWidget(window)
         
@@ -1400,6 +1402,9 @@ class TestEditorIntegration:
         file_path.write_text(large_content, encoding='utf-8')
         
         window.load_file(str(file_path))
+        
+        # Wait for deferred loading to complete
+        wait_for_deferred_load(window.editor)
         
         assert window.editor.blockCount() == 1000
         
