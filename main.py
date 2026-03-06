@@ -3024,8 +3024,8 @@ class TextEditor(QMainWindow):
         
         if defer_loading and file_size > 50 * 1024 * 1024:  # 50MB - very large file
             # For very large files, chunk by small character count to keep frame times under 16ms
-            # Aggressive chunking: 1MB per frame keeps responsiveness high
-            chunk_size = 1 * 1024 * 1024  # 1MB per chunk
+            # Aggressive chunking: 125KB per frame keeps responsiveness high
+            chunk_size = 125 * 1024  # 125KB per chunk
             editor._load_content = content  # Store full content
             editor._load_offset = 0
             editor._load_chunk_size = chunk_size

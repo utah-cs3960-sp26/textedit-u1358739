@@ -17,6 +17,7 @@ Total Memory Used : 62.2 MB
 
 Large.txt
 Max Opening File  : 398 ms
+Avg Max Opening File    : 34 ms
 Max Scroll        : 25 ms
 Max Click Far Away: 25 ms
 Avg Click Far Away: 16 ms
