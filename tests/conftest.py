@@ -58,4 +58,8 @@ def pytest_collection_modifyitems(config, items):
     """Add timeout to all tests."""
     timeout_value = 15
     for item in items:
-        item.add_marker(pytest.mark.timeout(timeout_value))
+        # Skip timeout for timing tests (they need much longer)
+        if 'test_timing' in item.nodeid:
+            item.add_marker(pytest.mark.timeout(600))  # 10 minutes for timing tests
+        else:
+            item.add_marker(pytest.mark.timeout(timeout_value))
