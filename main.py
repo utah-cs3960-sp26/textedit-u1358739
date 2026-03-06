@@ -3029,6 +3029,7 @@ class TextEditor(QMainWindow):
             editor._load_content = content  # Store full content
             editor._load_offset = 0
             editor._load_chunk_size = chunk_size
+            editor._loading_content = True  # Flag to skip on_text_changed during loading
             
             editor._load_timer = QTimer(editor)
             editor._load_timer.timeout.connect(lambda e=editor: self._load_next_chunk(e))
@@ -3052,13 +3053,15 @@ class TextEditor(QMainWindow):
         chunk = content[offset:next_offset]
         
         if not chunk:
-            # Done loading
+            # Done loading - clear loading flag and mark as unmodified
             editor._load_timer.stop()
+            editor._loading_content = False  # Allow on_text_changed to run again
             editor.document().setModified(False)
             del editor._load_content
             del editor._load_offset
             del editor._load_chunk_size
             del editor._load_timer
+            del editor._loading_content
             return
         
         # Load chunk using cursor operations - more efficient than setPlainText
@@ -3142,6 +3145,10 @@ class TextEditor(QMainWindow):
     
     def on_text_changed(self):
         """Update title and tab when text changes."""
+        # Skip if we're currently loading content in chunks
+        if hasattr(self.editor, '_loading_content') and self.editor._loading_content:
+            return
+        
         # Check if current content matches saved content
         tab_index = self.tab_widget.currentIndex()
         key = (self.active_pane, tab_index)
