@@ -999,13 +999,10 @@ class CodeEditor(QPlainTextEdit):
         
         # Only do highlighting work if the language has highlighting rules
         if self.highlighter.rules:
-            # For large files, highlight only visible blocks initially
-            if self.is_large_file:
-                self.highlight_visible_blocks()
-                self.highlight_timer.start()
-            else:
-                # For small files, highlight everything immediately
-                self.highlighter.rehighlight()
+            # For all files, use incremental highlighting to keep frame times low
+            # Highlight visible blocks first, then incrementally highlight the rest
+            self.highlight_visible_blocks()
+            self.highlight_timer.start()
     
     def set_text_color(self, color):
         """Set the text color for the editor."""
@@ -2976,15 +2973,16 @@ class TextEditor(QMainWindow):
             # Check if deferred loading is enabled
             defer_loading = os.environ.get('ENABLE_DEFERRED_LOAD', 'true').lower() == 'true'
             
-            # Store saved content for comparison (decode for smaller files, keep bytes for large)
+            # Store saved content for comparison
             tab_index = self.tab_widget.currentIndex()
             if isinstance(content, bytes) and file_size > 50 * 1024 * 1024:
-                # For very large files, store None for now (we'll decode on demand later)
+                # For very large files, store None to avoid decoding 250MB+ upfront
                 self.saved_content[(self.active_pane, tab_index)] = None
-            else:
+            elif isinstance(content, bytes):
                 # For smaller files, decode now for comparison
-                if isinstance(content, bytes):
-                    content = content.decode('utf-8', errors='ignore')
+                decoded_content = content.decode('utf-8', errors='ignore')
+                self.saved_content[(self.active_pane, tab_index)] = decoded_content
+            else:
                 self.saved_content[(self.active_pane, tab_index)] = content
             
             # Update tab title
@@ -2998,10 +2996,6 @@ class TextEditor(QMainWindow):
             self.current_file = file_path
             self.setWindowTitle(f"TextEdit - {file_path}")
             self.update_file_type(file_path)
-            
-            # Apply syntax highlighting based on file extension
-            editor.set_language_from_file(file_path)
-            self._update_language_menu_state(editor.highlighter.language)
             
             if defer_loading:
                 # Defer setting plain text to next frame to avoid UI blocking
@@ -3017,6 +3011,9 @@ class TextEditor(QMainWindow):
                 editor.setPlainText(content)
                 editor.document().setModified(False)
                 editor.blockSignals(False)
+                # Apply syntax highlighting based on file extension
+                editor.set_language_from_file(file_path)
+                self._update_language_menu_state(editor.highlighter.language)
             
             # Focus on editor so user can start typing immediately
             editor.setFocus()
@@ -3025,13 +3022,27 @@ class TextEditor(QMainWindow):
             traceback.print_exc()
             QMessageBox.critical(self, "Error", f"Could not open file:\n{e}")
     
+    def _apply_highlighting_to_loaded_editor(self, editor):
+        """Apply syntax highlighting to an editor that has fully loaded text.
+        
+        This is deferred until after loading completes to spread frame time.
+        """
+        if hasattr(editor, '_loading_file_path'):
+            file_path = editor._loading_file_path
+            # Apply syntax highlighting based on file extension
+            editor.set_language_from_file(file_path)
+            # Update language menu if this is the active editor
+            if hasattr(self, '_update_language_menu_state'):
+                self._update_language_menu_state(editor.highlighter.language)
+            del editor._loading_file_path
+    
     def _deferred_load_text(self, editor, file_path):
         """Load text into editor in deferred mode to spread across frames."""
         if not hasattr(editor, '_pending_file_load') or editor._pending_file_load is None:
             return
         
         pending = editor._pending_file_load
-        _, content = pending[0], pending[1]
+        pending_file_path, content = pending[0], pending[1]
         file_size = pending[2] if len(pending) > 2 else len(content)
         editor._pending_file_load = None
         
@@ -3042,14 +3053,21 @@ class TextEditor(QMainWindow):
         # For all files, use deferred loading to keep frame times low
         # Content is kept as bytes to avoid massive upfront decode
         
-        if defer_loading and file_size > 50 * 1024 * 1024:  # 50MB - very large file
-            # For very large files, chunk by bytes to keep frame times under 16ms
-            # Aggressive chunking: 62.5KB per frame keeps responsiveness high
-            chunk_size = int(62.5 * 1024)  # 62.5KB per chunk
+        if defer_loading:  # Always use chunked loading for deferred loading
+            # Calculate chunk size based on file size to keep each frame under 16ms
+            # For small files, use smaller chunks to spread loading across more frames
+            # For large files, use larger chunks for efficiency
+            if file_size < 100 * 1024:  # < 100KB: smaller chunks
+                chunk_size = int(10 * 1024)  # 10KB per chunk - spreads 10 frames minimum
+            elif file_size < 10 * 1024 * 1024:  # < 10MB: medium chunks
+                chunk_size = int(31.25 * 1024)  # 31.25KB per chunk
+            else:  # >= 10MB: large chunks
+                chunk_size = int(62.5 * 1024)  # 62.5KB per chunk
             editor._load_content = content  # Store full content as bytes
             editor._load_offset = 0
             editor._load_chunk_size = chunk_size
             editor._loading_content = True  # Flag to skip on_text_changed during loading
+            editor._loading_file_path = pending_file_path  # Store file path for highlighting after load
             # Create incremental decoder to handle UTF-8 boundaries properly
             import codecs
             editor._decoder = codecs.getincrementaldecoder('utf-8')(errors='ignore')
@@ -3058,14 +3076,19 @@ class TextEditor(QMainWindow):
             editor._load_timer.timeout.connect(lambda e=editor: self._load_next_chunk(e))
             editor._load_timer.start(16)  # ~60fps
         else:
-            # Load all at once (either deferred loading disabled or file is small enough)
+            # Load all at once for small files (< 100KB)
+            # Ensure content is decoded if it's bytes
             if isinstance(content, bytes):
-                content = content.decode('utf-8', errors='ignore')
+                decoded_content = content.decode('utf-8', errors='ignore')
+            else:
+                decoded_content = content
             # Block signals during text loading to prevent unsaved indicator from showing
             editor.blockSignals(True)
-            editor.setPlainText(content)
+            editor.setPlainText(decoded_content)
             editor.document().setModified(False)
             editor.blockSignals(False)
+            # Apply syntax highlighting based on file extension
+            editor.set_language_from_file(pending_file_path)
     
     def _load_next_chunk(self, editor):
         """Load the next chunk of content (bytes), decode and insert."""
@@ -3081,24 +3104,31 @@ class TextEditor(QMainWindow):
         byte_chunk = content_bytes[offset:next_offset]
         
         if not byte_chunk:
-            # Done loading - clear loading flag and mark as unmodified
-            editor._load_timer.stop()
-            editor._loading_content = False  # Allow on_text_changed to run again
-            # Flush any remaining bytes in the decoder
-            if hasattr(editor, '_decoder'):
-                final_text = editor._decoder.decode(b'', final=True)
-                if final_text:
-                    cursor = editor.textCursor()
-                    cursor.movePosition(QTextCursor.End)
-                    cursor.insertText(final_text)
-                del editor._decoder
-            editor.document().setModified(False)
-            del editor._load_content
-            del editor._load_offset
-            del editor._load_chunk_size
-            del editor._load_timer
-            del editor._loading_content
-            return
+             # Done loading - clear loading flag and mark as unmodified
+             editor._load_timer.stop()
+             editor._loading_content = False  # Allow on_text_changed to run again
+             # Flush any remaining bytes in the decoder
+             if hasattr(editor, '_decoder'):
+                 final_text = editor._decoder.decode(b'', final=True)
+                 if final_text:
+                     cursor = editor.textCursor()
+                     cursor.movePosition(QTextCursor.End)
+                     cursor.insertText(final_text)
+                 del editor._decoder
+             editor.document().setModified(False)
+             del editor._load_content
+             del editor._load_offset
+             del editor._load_chunk_size
+             del editor._load_timer
+             del editor._loading_content
+             
+             # Now that text is loaded, apply syntax highlighting based on file extension
+             # Defer this to the next frame to keep frame times low
+             if hasattr(editor, '_loading_file_path'):
+                 # Schedule language/highlighting setup for next frame
+                 QTimer.singleShot(0, lambda e=editor: self._apply_highlighting_to_loaded_editor(e))
+             
+             return
         
         # Decode this byte chunk using incremental decoder (handles UTF-8 boundaries)
         text_chunk = editor._decoder.decode(byte_chunk, final=False)

@@ -21,6 +21,9 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 os.chdir(PROJECT_ROOT)  # Change to project root so file paths work
 
+# Enable deferred loading for timing tests to measure actual performance
+os.environ['ENABLE_DEFERRED_LOAD'] = 'true'
+
 from PySide6.QtWidgets import QApplication, QPushButton
 from PySide6.QtCore import Qt, QTimer, QCoreApplication
 from PySide6.QtGui import QKeySequence, QTextCursor, QKeyEvent
