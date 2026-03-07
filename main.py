@@ -1340,21 +1340,15 @@ class FindReplaceDialog(QDialog):
              
              # For large content, defer the actual replacement to keep frames responsive
              if len(content) > 10 * 1024 * 1024:  # 10MB threshold
-                 # Store state for chunked processing
-                 self._replace_state = {
+                 # Store data for deferred processing - defer the split to the next frame
+                 self._pending_replace = {
                      'pattern': pattern_obj,
                      'replace_text': replace_text,
-                     'lines': content.split('\n'),
-                     'line_index': 0,
-                     'total_matches': matches,
-                     'replaced_count': 0
+                     'content': content,
+                     'total_matches': matches
                  }
-                 # Initialize lines per frame to a small value to avoid frame drops
-                 self._replace_lines_per_frame = 100
-                 # Start chunked replacement
-                 self._replace_timer = QTimer(self.editor)
-                 self._replace_timer.timeout.connect(self._replace_next_chunk)
-                 self._replace_timer.start(16)  # ~60fps
+                 # Defer the split operation to the next frame
+                 QTimer.singleShot(0, self._prepare_chunked_replace)
              else:
                  # For smaller files, do replacement all at once
                  new_content = pattern_obj.sub(replace_text, content)
@@ -1370,6 +1364,32 @@ class FindReplaceDialog(QDialog):
                  
                  # Show result (defer to avoid blocking in tests)
                  QTimer.singleShot(0, lambda: self._show_replace_result(matches))
+    
+    def _prepare_chunked_replace(self):
+         """Prepare for chunked replace by splitting content (deferred to next frame)."""
+         if not hasattr(self, '_pending_replace'):
+             return
+         
+         pending = self._pending_replace
+         del self._pending_replace
+         
+         # Now do the split on this frame (which is now a new frame)
+         self._replace_state = {
+             'pattern': pending['pattern'],
+             'replace_text': pending['replace_text'],
+             'lines': pending['content'].split('\n'),
+             'line_index': 0,
+             'total_matches': pending['total_matches'],
+             'replaced_count': 0
+         }
+         
+         # Initialize lines per frame to a small value to avoid frame drops
+         self._replace_lines_per_frame = 100
+         
+         # Start chunked replacement
+         self._replace_timer = QTimer(self.editor)
+         self._replace_timer.timeout.connect(self._replace_next_chunk)
+         self._replace_timer.start(16)  # ~60fps
     
     def _replace_next_chunk(self):
          """Process the next chunk of lines for find and replace."""
