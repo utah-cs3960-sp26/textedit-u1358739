@@ -1377,7 +1377,7 @@ class FindReplaceDialog(QDialog):
          self._replace_state = {
              'pattern': pending['pattern'],
              'replace_text': pending['replace_text'],
-             'lines': pending['content'].split('\n'),
+             'lines': pending['content'].split('\n'),  # DEMOOOOOOO First big frame in find and replace
              'line_index': 0,
              'total_matches': pending['total_matches'],
              'replaced_count': 0
@@ -1428,7 +1428,7 @@ class FindReplaceDialog(QDialog):
          # Check if we're done
          if end_idx >= len(state['lines']):
              # Join back the lines and update editor
-             new_content = '\n'.join(state['lines'])
+             new_content = '\n'.join(state['lines'])  # DEMOOOOOOO Last big frame in find and replace
              cursor = self.editor.textCursor()
              cursor.beginEditBlock()
              cursor.select(QTextCursor.Document)
@@ -2970,7 +2970,7 @@ class TextEditor(QMainWindow):
                 # Use memory-mapped file for very large files - keep as bytes
                 with open(file_path, 'rb') as f:
                     with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mmapped_file:
-                        content = bytes(mmapped_file[:])  # Copy to bytes object
+                        content = bytes(mmapped_file[:])  # Copy to bytes object  # DEMOOOOOO Slow down for opening a large file
             else:
                 # Normal read for smaller files
                 with open(file_path, 'rb') as f:
@@ -3002,7 +3002,7 @@ class TextEditor(QMainWindow):
             
             # Store saved content for comparison
             tab_index = self.tab_widget.currentIndex()
-            if isinstance(content, bytes) and file_size > 50 * 1024 * 1024:
+            if isinstance(content, bytes) and file_size > 50 * 1024 * 1024:  # > 50 MB
                 # For very large files, store None to avoid decoding 250MB+ upfront
                 self.saved_content[(self.active_pane, tab_index)] = None
             elif isinstance(content, bytes):
