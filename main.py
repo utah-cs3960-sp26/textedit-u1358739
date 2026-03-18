@@ -3254,7 +3254,7 @@ class TextEditor(QMainWindow):
         tab_index = self.tab_widget.currentIndex()
         key = (self.active_pane, tab_index)
         if key in self.saved_content:
-            current_content = self.editor.toPlainText()
+            current_content = self.editor.toPlainText()   # DEMOOOOOOO  When typing this toPlainText is running on the entire document.
             if current_content == self.saved_content[key]:
                 self.editor.document().setModified(False)
         
