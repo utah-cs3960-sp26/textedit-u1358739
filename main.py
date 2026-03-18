@@ -2970,7 +2970,7 @@ class TextEditor(QMainWindow):
                 # Use memory-mapped file for very large files - keep as bytes
                 with open(file_path, 'rb') as f:
                     with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mmapped_file:
-                        content = bytes(mmapped_file[:])  # Copy to bytes object  # DEMOOOOOO Slow down for opening a large file
+                        content = bytes(mmapped_file[:])  # Copy to bytes object  # DEMOOOOOOO Slow down for opening a large file
             else:
                 # Normal read for smaller files
                 with open(file_path, 'rb') as f:
